@@ -19,7 +19,7 @@ def kreek(nodes, edges):
 	while True:
 		(n, es) = next(((n, es) for (n, es) in ne.items() if len(es) % 2 == 1), (None, None))
 		if n is None: break
-		e1s = sorted([e for e in es if len([e2 for e2 in es if e2[0] == e[0] and e2[1] == e[1] and e2[2] == e[2]]) == 1], key = lambda e: e[3])
+		e1s = sorted([e for e in es if len([e2 for e2 in es if e2[0] == e[0] and e2[1] == e[1] and e2[2] == e[2]]) == 1], key = lambda e: (-(len(ne[e[0]])%2 + len(ne[e[1]])%2), e[3]))
 		dupedge(e1s[0])
 	# what do we got?
 	return ne
