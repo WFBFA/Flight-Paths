@@ -92,7 +92,7 @@ fn kreek(mut g: Graph) -> Graph {
 	let es1 = graph_edges(&g);
 	log::trace!("duped {} singular edges -> {}|{}", es1-es0, g.len(), es1);
 	while let Some(es) = g.values().find(|es| es.len() % 2 == 1) {
-		let mut es: Vec<&Rc<Edge>> = es.iter().filter(|e| es.iter().filter(|ee| e.is_similar(ee)).count() == 1).collect();
+		let mut es: Vec<&Rc<Edge>> = es.iter().filter(|e| !e.is_cycle() && es.iter().filter(|ee| e.is_similar(ee)).count() == 1).collect();
 		es.sort_unstable_by_key(|e| e.length);
 		es.into_iter().next().unwrap().dupe().add(&mut g).unwrap();
 	}
