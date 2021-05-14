@@ -138,6 +138,10 @@ fn graph_edges(g: &Graph) -> usize {
 	g.values().map(|es| es.len()).sum::<usize>()/2
 }
 
+fn graph_find_edges(g: &Graph, p1: &NodeId, p2: &NodeId) -> Vec<Rc<Edge>> {
+	g.get(p1).map_or(vec![], |es| es.iter().filter_map(|e| if e.other(p1) == p2 { Some(e.clone()) } else { None }).collect())
+}
+
 fn path_length(path: &Path) -> f64s {
 	path.iter().map(|e| e.length).sum()
 }
@@ -159,7 +163,7 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 		let cycle = &mut cycles[i];
 		if let Some((v, y)) = if cycle.len() > 0 {
 			let shmlop = path_shmlop(cycle, n);
-			(0..shmlop.len()).filter_map(|i| {
+			(0..shmlop.len()-1).filter_map(|i| {
 				let (v, _) = shmlop[i];
 				if g.get(v).unwrap().len() > 0 {
 					Some((v, i))
@@ -170,7 +174,7 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 		} else {
 			Some((n, 0))
 		} {
-			log::trace!("inflating {}", v);
+			log::trace!("inflating {} ({})", v, g.get(v).unwrap().len());
 			let inj = dijkstra_on_a_bicycle(&g, v).unwrap();
 			log::trace!("with {}", inj.len());
 			for e in &inj {
