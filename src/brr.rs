@@ -1,11 +1,11 @@
 use std::{convert::{TryFrom, TryInto}, rc::Rc};
 
-use indexmap::{IndexMap, indexmap};
+use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
 
 use crate::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Eq, Debug)]
 struct Edge {
 	p1: NodeId,
 	p2: NodeId,
@@ -58,6 +58,16 @@ impl PartialEq<Edge> for Edge {
 		self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx == other.iidx
 	}
 }
+impl std::hash::Hash for Edge {
+	fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
+		(&self.p1, &self.p2, self.discriminator.as_ref(), self.iidx).hash(h)
+	}
+}
+impl std::fmt::Display for Edge {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "({} - {} v{} #{}# {:.1}m)", self.p1, self.p2, self.discriminator.as_ref().map(|s| s.as_ref()).unwrap_or("-"), self.iidx, self.length.f())
+	}
+}
 
 type Graph = IndexMap<NodeId, Vec<Rc<Edge>>>;
 
@@ -103,27 +113,17 @@ fn kreek(mut g: Graph) -> Graph {
 
 /// Find shortest non-trivial undirected cycle on a vertex
 fn dijkstra_on_a_bicycle(g: &Graph, n0: &NodeId) -> Option<Path> {
-	let mut paths: IndexMap<NodeId, (f64s, Path)> = indexmap!{ n0.clone() => (f64s::ZERO, vec![]) };
-	let mut q: PriorityQueue<NodeId, f64s> = PriorityQueue::new();
-	q.push(n0.clone(), f64s::ZERO);
-	while let Some((n, _)) = q.pop() {
-		let (nd, np) = paths.get(&n).unwrap().clone();
-		if &n == n0 && nd > 0.0 {
-			return Some(np.clone());
+	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
+	q.push((n0.clone(), vec![]), f64s::ZERO);
+	while let Some(((n, path), d)) = q.pop() {
+		if &n == n0 && path.len() > 0 {
+			return Some(path);
 		}
 		for e in g.get(&n).unwrap() {
-			if !np.contains(e) {
-				let v = e.other(&n);
-				let vd = nd + e.length;
-				if match paths.get(v) {
-					Some((d, _)) => d <= &0.0 || &vd < d,
-					None => true
-				} {
-					let mut path = np.clone();
-					path.push(e.clone());
-					paths.insert(v.clone(), (vd, path));
-					q.push(v.clone(), -vd);
-				}
+			if !path.contains(e) {
+				let mut path = path.clone();
+				path.push(e.clone());
+				q.push((e.other(&n).clone(), path),  d + e.length);
 			}
 		}
 	}
