@@ -38,9 +38,7 @@ impl Edge {
 	}
 	fn add(self, g: &mut Graph) -> Result<(), String> {
 		let e = Rc::new(self);
-		if !e.is_cycle() {
-			g.get_mut(&e.p1).ok_or_else(|| format!("Nodes set missing {}", e.p1))?.push(e.clone());
-		}
+		g.get_mut(&e.p1).ok_or_else(|| format!("Nodes set missing {}", e.p1))?.push(e.clone());
 		g.get_mut(&e.p2).ok_or_else(|| format!("Nodes set missing {}", e.p2))?.push(e);
 		Ok(())
 	}
