@@ -135,7 +135,7 @@ fn graph_is_empty(g: &Graph) -> bool {
 }
 
 fn graph_edges(g: &Graph) -> usize {
-	g.values().map(|es| es.len()).sum::<usize>()
+	g.values().map(|es| es.len()).sum::<usize>()/2
 }
 
 fn path_length(path: &Path) -> f64s {
