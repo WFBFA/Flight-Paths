@@ -183,7 +183,10 @@ pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> 
 	if sns.len() < drones.len() {
 		return Err("Failed to locate positions to the road graph".to_string());
 	}
+	log::info!("Located drones");
 	let mut g = kreek(roads.try_into()?);
+	log::info!("Kreeked road graph");
 	let cycles = bl33p(g, &sns);
+	log::info!("Bleeped cycles");
 	Ok(cycles.into_iter().zip(sns.into_iter()).map(|(path, n0)| path_shmlop(&path, &n0).into_iter().map(|(node, discriminator)| data::PathSegment { node: node.clone(), discriminator: discriminator.map(Clone::clone) }).collect()).collect())
 }
