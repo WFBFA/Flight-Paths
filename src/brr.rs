@@ -183,10 +183,8 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 			cycle.splice(y..y, inj);
 		} else {
 			g.retain(|_, es| es.len() > 0);
-			panic!("The entirety of graph is not reachable from any of starting vertices.
-					Leftovers:
-					{:?}", g
-				);
+			log::warn!("Some sections of the graph are unreachable by along the road network from given starting points!: {:?}", g);
+			break;
 		}
 		log::trace!("{}|{} vs {}", g.len(), graph_edges(&g), cycles.iter().map(|c| format!("{}", c.len())).collect::<Vec<String>>().join("/"));
 	}
