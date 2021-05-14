@@ -157,8 +157,9 @@ fn path_shmlop<'a>(path: &'a Path, n0: &'a NodeId) -> Vec<(&'a NodeId, Option<&'
 /// Find list of cyclic paths over eulirian graph that together cover all edges starting/ending at specified vertices
 fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 	let mut cycles: Vec<Path> = sns.iter().map(|_| vec![]).collect();
+	let mut complete: Vec<bool> = sns.iter().map(|_| false).collect();
 	while cycles.len() > 0 && !graph_is_empty(&g) {
-		let i = (0..sns.len()).min_by_key(|i| path_length(&cycles[*i])).unwrap();
+		let i = (0..sns.len()).filter(|i| !complete[*i]).min_by_key(|i| path_length(&cycles[*i])).unwrap();
 		let n = &sns[i];
 		let cycle = &mut cycles[i];
 		if let Some((v, y)) = if cycle.len() > 0 {
@@ -182,9 +183,12 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 			}
 			cycle.splice(y..y, inj);
 		} else {
-			g.retain(|_, es| es.len() > 0);
-			log::warn!("Some sections of the graph are unreachable by along the road network from given starting points!: {:?}", g);
-			break;
+			complete[i] = true;
+			if complete.iter().all(|b| *b) {
+				g.retain(|_, es| es.len() > 0);
+				log::warn!("Some sections of the graph are unreachable by along the road network from given starting points!: {:?}", g);
+				break;
+			}
 		}
 		log::trace!("{}|{} vs {}", g.len(), graph_edges(&g), cycles.iter().map(|c| format!("{}", c.len())).collect::<Vec<String>>().join("/"));
 	}
