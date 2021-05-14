@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, rc::Rc};
+use std::{convert::{TryFrom, TryInto}, rc::Rc};
 
 use indexmap::{IndexMap, indexmap};
 use priority_queue::PriorityQueue;
@@ -138,10 +138,10 @@ fn path_length(path: &Path) -> f64s {
 	path.iter().map(|e| e.length).sum()
 }
 
-fn path_shmlop<'a>(path: &'a Path, n0: &'a NodeId) -> Vec<&'a NodeId> {
-	let mut vs = vec![n0];
+fn path_shmlop<'a>(path: &'a Path, n0: &'a NodeId) -> Vec<(&'a NodeId, Option<&'a NodeId>)> {
+	let mut vs = vec![(n0, None)];
 	for e in path {
-		vs.push(e.other(vs.last().unwrap()));
+		vs.push((e.other(vs.last().unwrap().0), e.discriminator.as_ref()));
 	}
 	vs
 }
@@ -156,7 +156,7 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 		if let Some((v, y)) = if cycle.len() > 0 {
 			let shmlop = path_shmlop(cycle, n);
 			(0..shmlop.len()).filter_map(|i| {
-				let v = shmlop[i];
+				let (v, _) = shmlop[i];
 				if g.get(v).unwrap().len() > 0 {
 					Some((v, i))
 				} else {
@@ -171,8 +171,19 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 				e.remove(&mut g);
 			}
 			cycle.splice(y..y, inj);
+		} else {
+			panic!("The entirety of graph is not reachable from any of starting vertices");
 		}
 	}
 	cycles
 }
 
+pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> Result<data::FlightPaths, String> {
+	let sns: Vec<NodeId> = drones.iter().flat_map(|l| roads.locate(l)).collect();
+	if sns.len() < drones.len() {
+		return Err("Failed to locate positions to the road graph".to_string());
+	}
+	let mut g = kreek(roads.try_into()?);
+	let cycles = bl33p(g, &sns);
+	Ok(cycles.into_iter().zip(sns.into_iter()).map(|(path, n0)| path_shmlop(&path, &n0).into_iter().map(|(node, discriminator)| data::PathSegment { node: node.clone(), discriminator: discriminator.map(Clone::clone) }).collect()).collect())
+}
