@@ -28,11 +28,19 @@ impl TryFrom<f64> for f64s {
 		}
 	}
 }
+impl From<f64s> for f64 {
+	fn from(f: f64s) -> Self {
+		f.0
+	}
+}
 impl f64s {
 	pub const INFINITY: Self = f64s(f64::INFINITY);
 	pub const ZERO: Self = f64s(0.0);
 	pub fn is_infinite(self) -> bool {
 		self.0.is_infinite()
+	}
+	pub fn f(self) -> f64 {
+		self.0
 	}
 }
 impl std::ops::Add<Self> for f64s {
