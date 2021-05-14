@@ -174,15 +174,19 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 		} else {
 			Some((n, 0))
 		} {
-			log::trace!("inflating {} ({})", v, g.get(v).unwrap().len());
+			// log::trace!("inflating {} ({})", v, g.get(v).unwrap().len());
 			let inj = dijkstra_on_a_bicycle(&g, v).unwrap();
-			log::trace!("with {}", inj.len());
+			// log::trace!("with {}", inj.len());
 			for e in &inj {
 				e.remove(&mut g);
 			}
 			cycle.splice(y..y, inj);
 		} else {
-			panic!("The entirety of graph is not reachable from any of starting vertices");
+			g.retain(|_, es| es.len() > 0);
+			panic!("The entirety of graph is not reachable from any of starting vertices.
+					Leftovers:
+					{:?}", g
+				);
 		}
 		log::trace!("{}|{} vs {}", g.len(), graph_edges(&g), cycles.iter().map(|c| format!("{}", c.len())).collect::<Vec<String>>().join("/"));
 	}
