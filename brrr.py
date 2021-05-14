@@ -89,7 +89,8 @@ def bl33p(ne, sns):
 # print(G)
 # # print(dijkstra_on_a_cycle(0, G))
 # print(bl33p(G, [0, 2]))
-E = [(0, 1, None, 1), (1, 2, None, 1), (2, 3, None, 1), (3, 0, None, 1)]
-G = kreek([0, 1, 2, 3], E)
+E = [(0, 0, None, 1), (0, 1, None, 1), (1, 2, None, 1), (2, 3, None, 1), (3, 4, None, 1), (4, 5, None, 1), (5, 0, None, 1), (2, 12, None, 1), (12, 13, None, 1), (14, 13, None, 1), (14, 3, None, 1), (13, 13, None, 1)]
+G = kreek([0, 1, 2, 3, 4, 5, 12, 13, 14], E)
 print(G)
 print(dijkstra_on_a_cycle(0, G))
+print(bl33p(G, [0]))
