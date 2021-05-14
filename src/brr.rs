@@ -76,7 +76,7 @@ type Path = Vec<Rc<Edge>>;
 impl TryFrom<data::RoadGraph> for Graph {
 	type Error = String;
 	fn try_from(rs: data::RoadGraph) -> Result<Self, Self::Error> {
-		let mut g: Graph = rs.nodes.into_iter().map(|n| (n.id, vec![])).collect();
+		let mut g: Graph = rs.nodes.nodes.into_iter().map(|n| (n.id, vec![])).collect();
 		for r in rs.roads {
 			Edge {
 				p1: r.p1,
@@ -190,7 +190,7 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 }
 
 pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> Result<data::FlightPaths, String> {
-	let sns: Vec<NodeId> = drones.iter().flat_map(|l| roads.locate(l)).collect();
+	let sns: Vec<NodeId> = drones.iter().flat_map(|l| roads.nodes.locate(l)).collect();
 	if sns.len() < drones.len() {
 		return Err("Failed to locate positions to the road graph".to_string());
 	}

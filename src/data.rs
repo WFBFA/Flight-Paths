@@ -34,10 +34,16 @@ pub struct Node {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RoadGraph {
 	pub roads: Vec<RoadSegment>,
+	#[serde(flatten)]
+	pub nodes: RoadGraphNodes,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RoadGraphNodes {
 	pub nodes: Vec<Node>,
 }
 
-impl RoadGraph {
+impl RoadGraphNodes {
 	pub fn locate(&self, l: &Location) -> Option<NodeId> {
 		match l {
 			Location::Coordinates(lon, lat) => self.nodes.iter().min_by_key(|Node {coordinates, ..}| f64s::try_from((*lon, *lat).distance(coordinates)).unwrap()).map(|n| n.id.clone()),
