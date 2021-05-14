@@ -103,24 +103,20 @@ fn kreek(mut g: Graph) -> Graph {
 
 /// Find shortest non-trivial undirected cycle on a vertex
 fn dijkstra_on_a_bicycle(g: &Graph, n0: &NodeId) -> Option<Path> {
-	let mut paths: IndexMap<NodeId, (f64s, Path)> = indexmap!{ n0.clone() => (f64s::INFINITY, vec![]) };
+	let mut paths: IndexMap<NodeId, (f64s, Path)> = indexmap!{ n0.clone() => (f64s::ZERO, vec![]) };
 	let mut q: PriorityQueue<NodeId, f64s> = PriorityQueue::new();
-	q.push(n0.clone(), -f64s::INFINITY);
+	q.push(n0.clone(), f64s::ZERO);
 	while let Some((n, _)) = q.pop() {
-		let (mut nd, np) = paths.get(&n).unwrap().clone();
-		if &n == n0 {
-			if nd.is_infinite() {
-				nd = f64s::try_from(0.0).unwrap();
-			} else {
-				return Some(np.clone());
-			}
+		let (nd, np) = paths.get(&n).unwrap().clone();
+		if &n == n0 && nd > 0.0 {
+			return Some(np.clone());
 		}
 		for e in g.get(&n).unwrap() {
 			if !np.contains(e) {
 				let v = e.other(&n);
 				let vd = nd + e.length;
 				if match paths.get(v) {
-					Some((d, _)) => &vd < d,
+					Some((d, _)) => d <= &0.0 || &vd < d,
 					None => true
 				} {
 					let mut path = np.clone();

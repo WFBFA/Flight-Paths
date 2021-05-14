@@ -36,7 +36,7 @@ def dijkstra_on_a_cycle(n0, ne):
 	ne = ne.copy()
 	dist = {}
 	pafs = {}
-	dist[n0] = math.inf
+	dist[n0] = 0
 	pafs[n0] = []
 	q = [(dist[n0], n0)]
 	heapq.heapify(q)
@@ -44,15 +44,13 @@ def dijkstra_on_a_cycle(n0, ne):
 		(_, n) = heapq.heappop(q)
 		if n is None: continue
 		nd = dist[n]
-		if n == n0:
-			if nd < math.inf: return pafs[n]
-			else: nd = 0
+		if n == n0 and nd > 0: return pafs[n]
 		for e in ne[n]:
 			path = pafs[n]
 			if e in path: continue
 			v = other(n, e)
 			vd = nd + e[3]
-			if v not in dist or vd < dist[v]:
+			if v not in dist or dist[v] <= 0 or vd < dist[v]:
 				path = path.copy()
 				path.append(e)
 				dist[v] = vd
