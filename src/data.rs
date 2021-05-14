@@ -7,8 +7,8 @@ pub struct RoadSegment {
 	pub p1: NodeId,
 	pub p2: NodeId,
 	pub discriminator: Option<NodeId>,
-	pub distance: f64,
-	//we aren't interested in the rest ~~just yet :P~~
+	pub distance: f64s,
+	pub sidewalks: (bool, bool),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
