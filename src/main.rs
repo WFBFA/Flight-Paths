@@ -29,6 +29,7 @@ fn main() -> std::io::Result<()> {
 									.help("Output JSON"))
 							.get_matches();
 	log::info!("Loading...");
+	log::trace!("tracing enabled");
 	let drones: data::Drones = serde_json::from_reader(&std::fs::File::open(matches.value_of("drones").unwrap())?).expect("Drones config invalid JSON");
 	let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Drones config invalid JSON");
 	log::info!("Loaded configuration");

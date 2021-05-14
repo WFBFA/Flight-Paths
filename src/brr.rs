@@ -84,16 +84,22 @@ impl TryFrom<data::RoadGraph> for Graph {
 
 /// Make a graph eulirian by duplicating edges
 fn kreek(mut g: Graph) -> Graph {
+	let es0 = graph_edges(&g);
+	log::trace!("kreek kreek started on -> {}|{}", g.len(), es0);
 	for i in 0..g.len() {
 		if let [e] = &g.get_index(i).unwrap().1[..] {
 			e.dupe().add(&mut g).unwrap();
 		}
 	}
+	let es1 = graph_edges(&g);
+	log::trace!("duped {} singular edges -> {}|{}", es1-es0, g.len(), es1);
 	while let Some(es) = g.values().find(|es| es.len() % 2 == 1) {
 		let mut es: Vec<&Rc<Edge>> = es.iter().filter(|e| es.iter().filter(|ee| e.is_similar(ee)).count() == 1).collect();
 		es.sort_unstable_by_key(|e| e.length);
 		es.into_iter().next().unwrap().dupe().add(&mut g).unwrap();
 	}
+	let es2 = graph_edges(&g);
+	log::trace!("duped {} additional edges -> {}|{}", es2-es1, g.len(), es2);
 	g
 }
 
@@ -134,6 +140,10 @@ fn graph_is_empty(g: &Graph) -> bool {
 	g.values().all(Vec::is_empty)
 }
 
+fn graph_edges(g: &Graph) -> usize {
+	g.values().map(|es| es.len()).sum::<usize>()
+}
+
 fn path_length(path: &Path) -> f64s {
 	path.iter().map(|e| e.length).sum()
 }
@@ -166,7 +176,9 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 		} else {
 			Some((n, 0))
 		} {
+			log::trace!("inflating {}", v);
 			let inj = dijkstra_on_a_bicycle(&g, v).unwrap();
+			log::trace!("with {}", inj.len());
 			for e in &inj {
 				e.remove(&mut g);
 			}
@@ -174,6 +186,7 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 		} else {
 			panic!("The entirety of graph is not reachable from any of starting vertices");
 		}
+		log::trace!("{}|{} vs {}", g.len(), graph_edges(&g), cycles.iter().map(|c| format!("{}", c.len())).collect::<Vec<String>>().join("/"));
 	}
 	cycles
 }
