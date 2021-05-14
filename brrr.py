@@ -33,31 +33,17 @@ def remedge(ne, e):
 
 def dijkstra_on_a_cycle(n0, ne):
 	""" Finds the shortest (non-trivial) [undirected] cycle on n0 """
-	ne = ne.copy()
-	dist = {}
-	pafs = {}
-	dist[n0] = 0
-	pafs[n0] = []
-	q = [(dist[n0], n0)]
-	heapq.heapify(q)
+	q = [(0, n0, [])]
 	while len(q) > 0:
-		(_, n) = heapq.heappop(q)
-		if n is None: continue
-		nd = dist[n]
-		if n == n0 and nd > 0: return pafs[n]
+		(nd, n, p) = heapq.heappop(q)
+		if n == n0 and len(p) > 0: return p
 		for e in ne[n]:
-			path = pafs[n]
-			if e in path: continue
+			if e in p: continue
+			path = p.copy()
+			path.append(e)
 			v = other(n, e)
 			vd = nd + e[3]
-			if v not in dist or dist[v] <= 0 or vd < dist[v]:
-				path = path.copy()
-				path.append(e)
-				dist[v] = vd
-				pafs[v] = path
-				for i in range(len(q)):
-					if q[i][1] == v: q[i] = (q[i][0], None)
-				heapq.heappush(q, (vd, v))
+			heapq.heappush(q, (vd, v, path))
 	return None
 
 # 1. Take a starting vertex
