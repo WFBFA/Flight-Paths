@@ -30,6 +30,9 @@ impl TryFrom<f64> for f64s {
 }
 impl f64s {
 	pub const INFINITY: Self = f64s(f64::INFINITY);
+	pub fn is_infinite(self) -> bool {
+		self.0.is_infinite()
+	}
 }
 impl std::ops::Add<Self> for f64s {
 	type Output = Self;
@@ -40,5 +43,11 @@ impl std::ops::Add<Self> for f64s {
 impl std::iter::Sum for f64s {
 	fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
 		iter.reduce(std::ops::Add::add).unwrap_or(Self(0.0))
+	}
+}
+impl std::ops::Neg for f64s {
+	type Output = Self;
+	fn neg(self) -> Self {
+		Self(-self.0)
 	}
 }

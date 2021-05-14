@@ -105,14 +105,14 @@ fn kreek(mut g: Graph) -> Graph {
 fn dijkstra_on_a_bicycle(g: &Graph, n0: &NodeId) -> Option<Path> {
 	let mut paths: IndexMap<NodeId, (f64s, Path)> = indexmap!{ n0.clone() => (f64s::INFINITY, vec![]) };
 	let mut q: PriorityQueue<NodeId, f64s> = PriorityQueue::new();
-	q.push(n0.clone(), f64s::INFINITY);
+	q.push(n0.clone(), -f64s::INFINITY);
 	while let Some((n, _)) = q.pop() {
 		let (mut nd, np) = paths.get(&n).unwrap().clone();
 		if &n == n0 {
-			if nd < f64s::INFINITY {
-				return Some(np.clone());
-			} else {
+			if nd.is_infinite() {
 				nd = f64s::try_from(0.0).unwrap();
+			} else {
+				return Some(np.clone());
 			}
 		}
 		for e in g.get(&n).unwrap() {
@@ -126,7 +126,7 @@ fn dijkstra_on_a_bicycle(g: &Graph, n0: &NodeId) -> Option<Path> {
 					let mut path = np.clone();
 					path.push(e.clone());
 					paths.insert(v.clone(), (vd, path));
-					q.push(v.clone(), vd);
+					q.push(v.clone(), -vd);
 				}
 			}
 		}
