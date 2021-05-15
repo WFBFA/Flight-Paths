@@ -8,6 +8,16 @@ Using the road graph and surveillance vehicle configuration (in JSONs as per the
 
 The app is a Rust CLI - just run with `cargo bin`.
 
+## Limitations
+
+Current algorithm will not utilize all of the vehicles starting at the same graph node if there are more vehicles there than half the number of augmented edges at that node.
+
+The vehicles are allowed to follow the road graph and only. That means that if there are _logically_ disconnected portions, even if they are physically accessible, they will not be visited (and you will get a warning).
+
+Flight speed, traffic control, weather, fuel/🔋 mileage, and most other physical conditions are _not_ taken into account.
+
+The lengths of paths of vehicles are balanced, to _some_ possible/reasonable extent.
+
 ## Example usage
 1. get ur road graph in `montreal.roads.json`
 2. create a vehicle configuration in `drones.json`. for example
