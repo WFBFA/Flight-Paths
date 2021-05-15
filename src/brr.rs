@@ -91,7 +91,7 @@ impl TryFrom<data::RoadGraph> for Graph {
 }
 
 /// Make a graph eulirian by duplicating edges
-fn kreek(mut g: Graph) -> Graph {
+fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Graph {
 	let es0 = graph_edges(&g);
 	log::trace!("kreek kreek started on -> {}|{}", g.len(), es0);
 	for i in 0..g.len() {
@@ -112,7 +112,7 @@ fn kreek(mut g: Graph) -> Graph {
 }
 
 /// Find shortest non-trivial undirected cycle on a vertex
-fn bicycle(g: &Graph, n0: &NodeId) -> Option<Path> {
+fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId) -> Option<Path> {
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
@@ -155,7 +155,7 @@ fn path_shmlop<'a>(path: &'a Path, n0: &'a NodeId) -> Vec<(&'a NodeId, Option<&'
 }
 
 /// Find list of cyclic paths over eulirian graph that together cover all edges starting/ending at specified vertices
-fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
+fn bl33p<const DIRESPECT: bool>(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 	let mut cycles: Vec<Path> = sns.iter().map(|_| vec![]).collect();
 	let mut complete: Vec<bool> = sns.iter().map(|_| false).collect();
 	while cycles.len() > 0 && !graph_is_empty(&g) {
@@ -176,7 +176,7 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 			Some((n, 0))
 		} {
 			// log::trace!("inflating {} ({})", v, g.get(v).unwrap().len());
-			let inj = bicycle(&g, v).unwrap();
+			let inj = bicycle::<DIRESPECT>(&g, v).unwrap();
 			// log::trace!("with {}", inj.len());
 			for e in &inj {
 				e.remove(&mut g);
@@ -201,9 +201,9 @@ pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> 
 		return Err("Failed to locate positions to the road graph".to_string());
 	}
 	log::info!("Located drones");
-	let mut g = kreek(roads.try_into()?);
+	let mut g = kreek::<false>(roads.try_into()?);
 	log::info!("Kreeked road graph");
-	let cycles = bl33p(g, &sns);
+	let cycles = bl33p::<false>(g, &sns);
 	log::info!("Bleeped cycles");
 	Ok(cycles.into_iter().zip(sns.into_iter()).map(|(path, n0)| path_shmlop(&path, &n0).into_iter().map(|(node, discriminator)| data::PathSegment { node: node.clone(), discriminator: discriminator.map(Clone::clone) }).collect()).collect())
 }
