@@ -112,7 +112,7 @@ fn kreek(mut g: Graph) -> Graph {
 }
 
 /// Find shortest non-trivial undirected cycle on a vertex
-fn dijkstra_on_a_bicycle(g: &Graph, n0: &NodeId) -> Option<Path> {
+fn bicycle(g: &Graph, n0: &NodeId) -> Option<Path> {
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
@@ -176,7 +176,7 @@ fn bl33p(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 			Some((n, 0))
 		} {
 			// log::trace!("inflating {} ({})", v, g.get(v).unwrap().len());
-			let inj = dijkstra_on_a_bicycle(&g, v).unwrap();
+			let inj = bicycle(&g, v).unwrap();
 			// log::trace!("with {}", inj.len());
 			for e in &inj {
 				e.remove(&mut g);
