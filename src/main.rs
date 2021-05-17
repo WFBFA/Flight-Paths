@@ -63,7 +63,7 @@ fn main() -> std::io::Result<()> {
 	} else if let Some(matches) = matches.subcommand_matches("geojson") {
 		log::info!("Loading...");
 		let roads: data::RoadGraphNodes = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
-		let paths: data::FlightPaths = serde_json::from_reader(&std::fs::File::open(matches.value_of("paths").unwrap())?).expect("Flight paths invalid JSON");
+		let paths: data::Paths = serde_json::from_reader(&std::fs::File::open(matches.value_of("paths").unwrap())?).expect("Flight paths invalid JSON");
 		let pref = matches.value_of("prefix").unwrap();
 		log::info!("Loaded configuration");
 		let g = gj::roads_to_nodes(roads);

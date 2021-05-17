@@ -26,6 +26,14 @@ pub struct RoadSegment {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub enum SidewalkSide {
+	#[serde(rename="left")]
+	Left,
+	#[serde(rename="right")]
+	Right,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Node {
 	pub id: NodeId,
 	pub coordinates: (f64, f64),
@@ -62,9 +70,33 @@ pub enum Location {
 pub type Drones = Vec<Location>;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct VehiclesConfiguration {
+	pub road: Vec<Location>,
+	pub sidewalk: Vec<Location>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PathSegment {
 	pub node: NodeId,
 	pub discriminator: Option<NodeId>,
 }
 
-pub type FlightPaths = Vec<Vec<PathSegment>>;
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct SidewalkPathSegment {
+	pub node: NodeId,
+	pub discriminator: Option<NodeId>,
+	pub side: Option<SidewalkSide>,
+}
+
+pub type Paths = Vec<Vec<PathSegment>>;
+pub type SidewalkPaths = Vec<Vec<SidewalkPathSegment>>;
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct SnowStatusElement {
+	pub p1: NodeId,
+	pub p2: NodeId,
+	pub discriminator: Option<NodeId>,
+	pub depth: f64s,
+}
+
+pub type SnowStatuses = Vec<SnowStatusElement>;

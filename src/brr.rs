@@ -195,7 +195,7 @@ fn bl33p<const DIRESPECT: bool>(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 	cycles
 }
 
-pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> Result<data::FlightPaths, String> {
+pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> Result<data::Paths, String> {
 	let sns: Vec<NodeId> = drones.iter().flat_map(|l| roads.nodes.locate(l)).collect();
 	if sns.len() < drones.len() {
 		return Err("Failed to locate positions to the road graph".to_string());
