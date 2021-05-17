@@ -21,6 +21,7 @@ pub struct RoadSegment {
 	pub p1: NodeId,
 	pub p2: NodeId,
 	pub discriminator: Option<NodeId>,
+	pub directed: bool,
 	pub distance: f64s,
 	pub sidewalks: (bool, bool),
 }

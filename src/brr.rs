@@ -10,6 +10,7 @@ struct Edge {
 	p1: NodeId,
 	p2: NodeId,
 	discriminator: Option<NodeId>,
+	directed: bool,
 	length: f64s,
 	iidx: u64,
 }
@@ -25,6 +26,7 @@ impl Edge {
 			p1: self.p1.clone(),
 			p2: self.p2.clone(),
 			discriminator: self.discriminator.clone(),
+			directed: self.directed,
 			length: self.length,
 			iidx: self.iidx+1,
 		}
@@ -82,6 +84,7 @@ impl TryFrom<data::RoadGraph> for Graph {
 				p1: r.p1,
 				p2: r.p2,
 				discriminator: r.discriminator,
+				directed: r.directed,
 				length: r.distance,
 				iidx: 0
 			}.add(&mut g)?;
