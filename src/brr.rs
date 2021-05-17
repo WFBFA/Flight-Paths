@@ -1,4 +1,4 @@
-use std::{convert::{TryFrom, TryInto}, rc::Rc};
+use std::{cmp::max, convert::{TryFrom, TryInto}, rc::Rc};
 
 use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
@@ -206,4 +206,20 @@ pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> 
 	let cycles = bl33p::<false>(g, &sns);
 	log::info!("Bleeped cycles");
 	Ok(cycles.into_iter().zip(sns.into_iter()).map(|(path, n0)| path_shmlop(&path, &n0).into_iter().map(|(node, discriminator)| data::PathSegment { node: node.clone(), discriminator: discriminator.map(Clone::clone) }).collect()).collect())
+}
+
+/// Merge snow samplings with following rules:
+/// - between a sample without snow and a sample with some snow, sampling with snow wins
+/// - depths of all samples for given road segment are averaged
+pub fn merge_snow_statuses(snows: impl Iterator<Item = data::SnowStatusElement>) -> data::SnowStatuses {
+	let mut keyed = IndexMap::new();
+	for s in snows {
+		let entry = keyed.entry((s.p1, s.p2, s.discriminator)).or_insert(f64s::ZERO);
+		if *entry <= f64s::ZERO || s.depth <= f64s::ZERO {
+			*entry = max(*entry, s.depth);
+		} else {
+			*entry = ((entry.f() + s.depth.f()) / 2.0).try_into().unwrap();
+		}
+	}
+	keyed.into_iter().map(|((p1, p2, discriminator), depth)| data::SnowStatusElement { p1, p2, discriminator, depth }).collect()
 }

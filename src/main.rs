@@ -32,6 +32,18 @@ fn main() -> std::io::Result<()> {
 										.index(3)
 										.help("Output JSON"))
 							)
+							.subcommand(SubCommand::with_name("snows")
+								.about("Merge multiple snow status updates")
+								.arg(Arg::with_name("output")
+										.takes_value(true)
+										.required(true)
+										.index(1)
+										.help("Merged snow status output JSON"))
+								.arg(Arg::with_name("snows")
+										.takes_value(true)
+										.required(true)
+										.multiple(true)
+										.help("Let it snow let it snow let it go")))
 							.subcommand(SubCommand::with_name("geojson")
 								.about("Convert computed flight paths into distinct GeoJSONs")
 								.arg(Arg::with_name("road-graph")
@@ -51,8 +63,8 @@ fn main() -> std::io::Result<()> {
 										.help(r#"GeoJSON files prefix - the generated files will be named "{prefix}.{index}.geojson""#))
 							)
 							.get_matches();
+	log::info!("Loading...");
 	if let Some(matches) = matches.subcommand_matches("fly") {
-		log::info!("Loading...");
 		log::trace!("tracing enabled");
 		let drones: data::Drones = serde_json::from_reader(&std::fs::File::open(matches.value_of("drones").unwrap())?).expect("Drones config invalid JSON");
 		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph invalid JSON");
@@ -60,8 +72,14 @@ fn main() -> std::io::Result<()> {
 		let paths = brr::construct_flight_paths(roads, &drones).unwrap();
 		log::info!("Constructed paths");
 		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
+	} else if let Some(matches) = matches.subcommand_matches("snows") {
+		let mut snu: Vec<data::SnowStatuses> = Vec::new();
+		for f in matches.values_of("snows").unwrap() {
+			snu.push(serde_json::from_reader(&std::fs::File::open(f)?).expect("Snow status invalid JSON"));
+		}
+		log::info!("Loaded ❄");
+		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &brr::merge_snow_statuses(snu.into_iter().flatten())).unwrap();
 	} else if let Some(matches) = matches.subcommand_matches("geojson") {
-		log::info!("Loading...");
 		let roads: data::RoadGraphNodes = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
 		let paths: data::Paths = serde_json::from_reader(&std::fs::File::open(matches.value_of("paths").unwrap())?).expect("Flight paths invalid JSON");
 		let pref = matches.value_of("prefix").unwrap();
