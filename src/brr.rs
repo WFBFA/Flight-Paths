@@ -93,28 +93,60 @@ impl TryFrom<data::RoadGraph> for Graph {
 	}
 }
 
+/// Calculate combined degree of a vertex
+fn combined_degree<const DIRESPECT: bool>(n: &NodeId, edges: &Vec<Rc<Edge>>) -> i64 {
+	if DIRESPECT {
+		-(edges.iter().filter(|e| e.directed && &e.p1 == n).count() as i64 - edges.iter().filter(|e| e.directed && &e.p2 == n).count() as i64).abs() + edges.iter().filter(|e| !e.directed).count() as i64
+	} else {
+		edges.len() as i64
+	}
+}
+
+/// Check whether the given node does not prevent a graph from being eulirian
+fn eulirian_compatible<const DIRESPECT: bool>(n: &NodeId, edges: &Vec<Rc<Edge>>) -> bool {
+	let d = combined_degree::<DIRESPECT>(n, edges);
+	d % 2 == 0 && (!DIRESPECT || d >= 0)
+}
+
+/// Pick the best edge to augment
+fn kreek_pick<'a, const DIRESPECT: bool>(g: &Graph, n: &NodeId, es: &'a Vec<Rc<Edge>>) -> &'a Rc<Edge> {
+	let epre = es.iter().filter(|e| !e.is_cycle() && es.iter().filter(|ee| e.is_similar(ee)).count() == 1);
+	if DIRESPECT {
+		let ind = es.iter().filter(|e| e.directed && &e.p2 == n).count();
+		let outd = es.iter().filter(|e| e.directed && &e.p1 == n).count();
+		let mut es: Vec<&Rc<Edge>> = epre.filter(|e| !e.directed || (outd > ind && &e.p2 == n) || (ind > outd && &e.p1 == n)).collect();
+		es.sort_unstable_by_key(|e| (-((g.get(&e.p1).unwrap().len()%2 + g.get(&e.p2).unwrap().len()%2) as i64), e.length)); //TODO we can do better!
+		es
+	} else {
+		let mut es: Vec<&Rc<Edge>> = epre.collect();
+		es.sort_unstable_by_key(|e| (-((g.get(&e.p1).unwrap().len()%2 + g.get(&e.p2).unwrap().len()%2) as i64), e.length));
+		es
+	}.into_iter().next().unwrap()
+}
+
 /// Make a graph eulirian by duplicating edges
-fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Graph {
+fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 	let es0 = graph_edges(&g);
 	log::trace!("kreek kreek started on -> {}|{}", g.len(), es0);
 	for i in 0..g.len() {
 		if let [e] = &g.get_index(i).unwrap().1[..] {
+			if DIRESPECT && e.directed && &e.p2 == g.get_index(i).unwrap().0 {
+				return Err(format!("Can not make augment a directed graph to Eulirian when it has one-way stumbles ({:?})", e));
+			}
 			e.dupe().add(&mut g).unwrap();
 		}
 	}
 	let es1 = graph_edges(&g);
 	log::trace!("duped {} singular edges -> {}|{}", es1-es0, g.len(), es1);
-	while let Some(es) = g.values().find(|es| es.len() % 2 == 1) {
-		let mut es: Vec<&Rc<Edge>> = es.iter().filter(|e| !e.is_cycle() && es.iter().filter(|ee| e.is_similar(ee)).count() == 1).collect();
-		es.sort_unstable_by_key(|e| (-((g.get(&e.p1).unwrap().len()%2 + g.get(&e.p2).unwrap().len()%2) as i64), e.length));
-		es.into_iter().next().unwrap().dupe().add(&mut g).unwrap();
+	while let Some((n, es)) = g.iter().find(|(n, es)| !eulirian_compatible::<DIRESPECT>(n, es)) {
+		kreek_pick::<DIRESPECT>(&g, n, es).dupe().add(&mut g).unwrap();
 	}
 	let es2 = graph_edges(&g);
 	log::trace!("duped {} additional edges -> {}|{}", es2-es1, g.len(), es2);
-	g
+	Ok(g)
 }
 
-/// Find shortest non-trivial undirected cycle on a vertex
+/// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId) -> Option<Path> {
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
@@ -123,7 +155,7 @@ fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId) -> Option<Path> {
 			return Some(path);
 		}
 		for e in g.get(&n).unwrap() {
-			if !path.contains(e) {
+			if !path.contains(e) && (!DIRESPECT || !e.directed || e.p1 == n) {
 				let mut path = path.clone();
 				path.push(e.clone());
 				q.push((e.other(&n).clone(), path),  d + e.length);
@@ -204,7 +236,7 @@ pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> 
 		return Err("Failed to locate positions to the road graph".to_string());
 	}
 	log::info!("Located drones");
-	let mut g = kreek::<false>(roads.try_into()?);
+	let mut g = kreek::<false>(roads.try_into()?)?;
 	log::info!("Kreeked road graph");
 	let cycles = bl33p::<false>(g, &sns);
 	log::info!("Bleeped cycles");
