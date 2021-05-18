@@ -507,7 +507,7 @@ pub mod plow {
 			}
 		}
 		for _mi in 0..params.annealing.main_iterations {
-			log::trace!("iteration {}", _mi);
+			log::trace!("iteration {} current best {:.1}", _mi, value_best.f());
 			let mut prev_sol = g.sol.iter().map(|_| Vec::new()).collect();
 			swap(&mut g.sol, &mut prev_sol);
 			//Try to improve allocations
@@ -560,7 +560,7 @@ pub mod plow {
 					let mut vycles: Vec<Vec<_>> = g.sol.iter().zip(g.vehicles.iter()).map(|(path, n0)| super::path_shmlop(path, n0).into_iter().map(|(v, _)| v.clone()).collect()).collect();
 					for i in 0..vs {
 						'nexc: for j in (i+1)..vs {
-							let (i, j) = if costs[i] > costs[j] { (order[i], order[j]) } else { (order[j], order[i]) };
+							let (i, j) = if costs[order[i]] > costs[order[j]] { (order[i], order[j]) } else { (order[j], order[i]) };
 							for iu in 0..vycles[i].len() {
 								for ju in 0..vycles[j].len() {
 									if vycles[i][iu] == vycles[j][ju] {
@@ -594,8 +594,11 @@ pub mod plow {
 					}
 					let value_improv = cost_all_improv * params.weight_total + cost_max_improv * params.weight_max;
 					log::trace!(" improved value: {:.5}", value_improv.f());
+					if value_improv < value {
+						log::trace!(" chances: {}", ((value_improv-value).f()/temperature).exp());
+					}
 					//if the improved solution is actually better, or with some chance anyway, keep it
-					if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rng.gen_range(0.0..1.0) < (-(value_improv-value).f()/temperature).exp() {
+					if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || (value_improv < value && rng.gen_range(0.0..1.0) < ((value_improv-value).f()/temperature).exp()) {
 						log::trace!(" improvements accepted");
 						value_best = value_improv;
 						cost_best = cost_max_improv;
