@@ -173,6 +173,10 @@ fn graph_edges(g: &Graph) -> usize {
 	g.values().map(|es| es.len()).sum::<usize>()/2
 }
 
+fn graph_find_edge(g: &Graph, p1: &NodeId, p2: &NodeId, discriminator: Option<&NodeId>) -> Option<Rc<Edge>> {
+	g.get(p1).and_then(|es| es.iter().find(|e| e.other(p1) == p2 && e.discriminator.as_ref() == discriminator)).map(Clone::clone)
+}
+
 fn graph_find_edges(g: &Graph, p1: &NodeId, p2: &NodeId) -> Vec<Rc<Edge>> {
 	g.get(p1).map_or(vec![], |es| es.iter().filter_map(|e| if e.other(p1) == p2 { Some(e.clone()) } else { None }).collect())
 }
@@ -315,5 +319,33 @@ pub mod meta {
 		pub reorder: Reorder, //ChV
 		pub realloc: Realloc, //MV
 		pub annealing: Annealing,
+	}
+}
+
+mod plow {
+	use crate::*;
+	use super::meta::*;
+
+	use std::collections::HashSet;
+
+	type Edge = std::rc::Rc<super::Edge>;
+	struct Graph {
+		nodes: indexmap::IndexMap<NodeId, Vec<Edge>>,
+		snowy: HashSet<Edge>,
+		vehicles: Vec<NodeId>,
+		allocations: Vec<HashSet<Edge>>,
+		sol: Vec<Vec<Edge>>,
+	}
+	impl Graph {
+		/// merely constructs a new instance and initializes snow information, does not allocate or any of that
+		fn new(g: super::Graph, snow: data::SnowStatuses, vehicles: Vec<NodeId>) -> Self {
+			Self {
+				snowy: snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| super::graph_find_edge(&g, &s.p1, &s.p2, s.discriminator.as_ref()).expect("Snow status edge not found")).collect(),
+				allocations: vehicles.iter().map(|_| HashSet::new()).collect(),
+				sol: vehicles.iter().map(|_| Vec::new()).collect(),
+				vehicles,
+				nodes: g,
+			}
+		}
 	}
 }
