@@ -492,7 +492,7 @@ pub mod plow {
 			}
 		}
 		for _ in 0..params.annealing.main_iterations {
-			let mut prev_sol = vec![];
+			let mut prev_sol = g.sol.iter().map(|_| Vec::new()).collect();
 			swap(&mut g.sol, &mut prev_sol);
 			//Try to improve allocations
 			//TODO? change alloc
