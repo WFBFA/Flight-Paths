@@ -381,7 +381,8 @@ pub mod plow {
 		/// merely constructs a new instance and initializes snow information, does not allocate or any of that
 		fn new(g: super::Graph, nodes: data::RoadGraphNodes, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: Vec<NodeId>) -> Self {
 			Self {
-				snowy: if snow_d.is_some() {
+				snowy: if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
+					log::trace!("Default snow level {:.5} - every edge counts!", _snow_d);
 					g.values().flatten().cloned().collect()
 				} else {
 					snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| super::graph_find_edge(&g, &s.p1, &s.p2, s.discriminator.as_ref()).expect("Snow status edge not found")).collect()
@@ -479,6 +480,7 @@ pub mod plow {
 	/// do the thing!
 	fn sno_plo<const DIRESPECT: bool>(g: &mut Graph, params: Parameters) -> Result<(), String> {
 		initial_allocation(g)?;
+		log::trace!("Initialized allocations");
 		let mut rng = rand::thread_rng();
 		let mut cost_best = f64s::INFINITY;
 		let mut value_best = f64s::INFINITY;
@@ -491,7 +493,8 @@ pub mod plow {
 				g.sol[$i].iter().map(|e| e.length * if g.allocations[$i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum()
 			}
 		}
-		for _ in 0..params.annealing.main_iterations {
+		for _mi in 0..params.annealing.main_iterations {
+			log::trace!("iteration {}", _mi);
 			let mut prev_sol = g.sol.iter().map(|_| Vec::new()).collect();
 			swap(&mut g.sol, &mut prev_sol);
 			//Try to improve allocations
@@ -506,6 +509,7 @@ pub mod plow {
 				},
 				Reorder::RandomReorder => order.shuffle(&mut rng),
 			}
+			log::trace!(" new order: {:?}", order);
 			//Provide new solutions
 			let mut cost_all = f64s::ZERO;
 			let mut cost_max = f64s::ZERO;
@@ -525,8 +529,10 @@ pub mod plow {
 			}
 			let (cost_all, cost_max) = (cost_all, cost_max); //freeze
 			let value = cost_all * params.weight_total + cost_max * params.weight_max;
+			log::trace!(" new value: {:.5}", value.f());
 			//Accept solution for new allocations
 			if value < value_best || (value <= value_best && cost_max < cost_best) {
+				log::trace!(" solution accepted");
 				value_best = value;
 				cost_best = cost_max;
 				if params.clearing == Clearing::All {
@@ -573,14 +579,17 @@ pub mod plow {
 						}
 					}
 					let value_improv = cost_all_improv * params.weight_total + cost_max_improv * params.weight_max;
+					log::trace!(" improved value: {:.5}", value_improv.f());
 					//if the improved solution is actually better, or with some chance anyway, keep it
 					if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rng.gen_range(0.0..1.0) < (-(value_improv-value).f()/temperature).exp() {
+						log::trace!(" improvements accepted");
 						value_best = value_improv;
 						cost_best = cost_max_improv;
 						if params.clearing == Clearing::All {
 							sol_to_alloc(g);
 						}
 					} else {
+						log::trace!(" improvements rejected");
 						g.sol = prev_sol
 					}
 				}
@@ -591,6 +600,7 @@ pub mod plow {
 			if ii >= params.annealing.ft_iterations {
 				ii = 0;
 				temperature *= params.annealing.cooling_factor;
+				log::trace!(" t={:.2}", temperature);
 			}
 		}
 		Ok(())
@@ -601,8 +611,10 @@ pub mod plow {
 			return Err("Failed to locate positions to the road graph".to_string());
 		}
 		log::info!("Located vehicles");
+		log::trace!("{:?}", sns);
 		let nodes = roads.nodes.clone();
 		let mut g = Graph::new(roads.try_into()?, nodes, snow, snow_d, sns);
+		log::trace!("Constructed graph with {} nodes, {}/{} snowed segments, and {} vehicles", g.nodes.len(), g.snowy.len(), super::graph_edges(&g.edges), g.vehicles.len());
 		sno_plo::<false>(&mut g, params)?;
 		Ok(g.sol.into_iter().zip(g.vehicles.into_iter()).map(|(path, n0)| super::path_shmlop(&path, &n0).into_iter().map(|(node, discriminator)| data::PathSegment { node: node.clone(), discriminator: discriminator.map(Clone::clone) }).collect()).collect())
 	}
