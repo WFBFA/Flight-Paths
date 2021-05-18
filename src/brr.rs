@@ -383,7 +383,7 @@ pub mod plow {
 			Self {
 				snowy: if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 					log::trace!("Default snow level {:.5} - every edge counts!", _snow_d);
-					g.values().flatten().cloned().collect()
+					g.values().flatten().filter(|e| e.iidx == 0).cloned().collect()
 				} else {
 					snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| super::graph_find_edge(&g, &s.p1, &s.p2, s.discriminator.as_ref()).expect("Snow status edge not found")).collect()
 				},
