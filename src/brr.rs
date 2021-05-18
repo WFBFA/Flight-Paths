@@ -316,13 +316,13 @@ pub mod meta {
 	}
 	
 	#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
-	pub enum Reorder { //idk if this is relevant for geographically positionned vehicles
+	pub enum Reorder {
 		/// don't reorder
 		No,
 		/// swap 2 at random
 		Swap2Random,
-		// /// generate new random order
-		// RandomReorder,
+		/// generate new random order
+		RandomReorder,
 		/// swap most and least used
 		Swap2MostLeast,
 	}
@@ -362,9 +362,10 @@ mod plow {
 	use crate::*;
 	use data::Distance;
 	use itertools::Itertools;
+	use rand::{Rng, prelude::SliceRandom};
 	use super::meta::*;
 
-	use std::convert::TryFrom;
+	use std::{convert::TryFrom, mem::swap};
 	use std::collections::{HashSet, HashMap};
 
 	type Edge = std::rc::Rc<super::Edge>;
@@ -460,22 +461,34 @@ mod plow {
 	/// do the thing!
 	fn sno_plo<const DIRESPECT: bool>(g: &mut Graph, params: Parameters) -> Result<(), String> {
 		initial_allocation(g)?;
+		let mut rng = rand::thread_rng();
 		let mut cost_best = f64s::INFINITY;
 		let mut value_best = f64s::INFINITY;
 		let mut temperature: f64 = params.annealing.starting_temperature;
 		let mut ii = 0u64;
+		let vs = g.vehicles.len();
+		let mut order: Vec<_> = (0..vs).collect();
 		for _ in 0..params.annealing.main_iterations {
 			let mut prev_sol = vec![];
-			std::mem::swap(&mut g.sol, &mut prev_sol);
+			swap(&mut g.sol, &mut prev_sol);
 			//Try to improve allocations
 			//TODO? change alloc
-			//TODO? change order
+			match params.reorder {
+				Reorder::No => {},
+				Reorder::Swap2Random => order.swap(rng.gen_range(0..vs), rng.gen_range(0..vs)),
+				Reorder::Swap2MostLeast => {
+					if let itertools::MinMaxResult::MinMax(i, j) = order.iter().cloned().minmax_by_key(|i| g.sol[*i].len()) {
+						order.swap(i, j);
+					}
+				},
+				Reorder::RandomReorder => order.shuffle(&mut rng),
+			}
 			let mut cost_all = f64s::ZERO;
 			let mut cost_max = f64s::ZERO;
-			for i in 0..g.vehicles.len() {
-				solve_rpp::<DIRESPECT>(g, i);
+			for i in &order {
+				solve_rpp::<DIRESPECT>(g, *i);
 				//TODO mark done
-				let cost: f64s = g.sol[i].iter().map(|e| e.length * if g.allocations[i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum();
+				let cost: f64s = g.sol[*i].iter().map(|e| e.length * if g.allocations[*i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum();
 				cost_all = cost_all + cost;
 				if cost > cost_max {
 					cost_max = cost;
@@ -502,8 +515,7 @@ mod plow {
 			}
 			//TODO? if RS then revfromtour
 			//if the improved solution is actually better, or with some chance anyway, keep it
-			let rnd = 0.5;
-			if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rnd < (-(value_improv-value).f()/temperature).exp() {
+			if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rng.gen_range(0.0..1.0) < (-(value_improv-value).f()/temperature).exp() {
 				value_best = value_improv;
 				cost_best = cost_max_improv;
 				if params.clearing == Clearing::All {
