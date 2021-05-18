@@ -501,7 +501,9 @@ mod plow {
 			let mut cost_max = f64s::ZERO;
 			for i in &order {
 				solve_rpp::<DIRESPECT>(g, *i);
-				//TODO mark done
+				if params.clearing == Clearing::All {
+					sol_to_alloc(g); //TODO we can do better tho!
+				}
 				let cost: f64s = g.sol[*i].iter().map(|e| e.length * if g.allocations[*i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum();
 				cost_all = cost_all + cost;
 				if cost > cost_max {
