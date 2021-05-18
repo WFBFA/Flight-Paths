@@ -458,6 +458,20 @@ mod plow {
 			}
 		}
 	}
+	/// updates allocation from solution
+	fn sol_to_alloc(g: &mut Graph){
+		for i in 0..g.sol.len() {
+			for e in &g.sol[i] {
+				if g.allocations[i].insert(e.clone()) {
+					for a in 0..g.allocations.len() {
+						if a != i {
+							g.allocations[a].remove(e);
+						}
+					}
+				}
+			}
+		}
+	}
 	/// do the thing!
 	fn sno_plo<const DIRESPECT: bool>(g: &mut Graph, params: Parameters) -> Result<(), String> {
 		initial_allocation(g)?;
@@ -500,7 +514,7 @@ mod plow {
 				value_best = value;
 				cost_best = cost_max;
 				if params.clearing == Clearing::All {
-					//TODO revfromtour
+					sol_to_alloc(g);
 				}
 				prev_sol = g.sol.clone();
 			}
@@ -513,13 +527,16 @@ mod plow {
 				}
 				Recycle::No => {}
 			}
-			//TODO? if RS then revfromtour
+			let rs = params.recycle == Recycle::ExpensiveToCheap;
+			if rs {
+				sol_to_alloc(g);
+			}
 			//if the improved solution is actually better, or with some chance anyway, keep it
 			if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rng.gen_range(0.0..1.0) < (-(value_improv-value).f()/temperature).exp() {
 				value_best = value_improv;
 				cost_best = cost_max_improv;
 				if params.clearing == Clearing::All {
-					//TODO revfromtour
+					sol_to_alloc(g);
 				}
 			} else {
 				g.sol = prev_sol
