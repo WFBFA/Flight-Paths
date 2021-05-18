@@ -55,6 +55,18 @@ impl std::ops::Sub<Self> for f64s {
 		f64s(self.0 - f.0)
 	}
 }
+impl std::ops::Mul<Self> for f64s {
+	type Output = Self;
+	fn mul(self, f: Self) -> Self::Output {
+		f64s(self.0 * f.0)
+	}
+}
+impl std::ops::Div<Self> for f64s {
+	type Output = Self;
+	fn div(self, f: Self) -> Self::Output {
+		f64s(self.0 / f.0)
+	}
+}
 impl std::iter::Sum for f64s {
 	fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
 		iter.reduce(std::ops::Add::add).unwrap_or(Self(0.0))

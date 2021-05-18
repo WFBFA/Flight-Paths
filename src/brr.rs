@@ -296,9 +296,10 @@ pub fn merge_snow_statuses(snows: impl Iterator<Item = data::SnowStatusElement>)
 }
 
 pub mod meta {
+	use crate::*;
 	use serde::*;
 
-	#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+	#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 	pub enum Recycle {
 		/// do not move cycles
 		No,
@@ -306,7 +307,7 @@ pub mod meta {
 		ExpensiveToCheap,
 	}
 
-	#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+	#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 	pub enum Clearing {
 		/// the vehicle clears only the allocated edges
 		OnlyAllocated,
@@ -314,7 +315,7 @@ pub mod meta {
 		All,
 	}
 	
-	#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+	#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 	pub enum Reorder { //idk if this is relevant for geographically positionned vehicles
 		/// don't reorder
 		No,
@@ -326,7 +327,7 @@ pub mod meta {
 		Swap2MostLeast,
 	}
 	
-	#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+	#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 	pub enum Realloc {
 		/// don't
 		No,
@@ -336,7 +337,7 @@ pub mod meta {
 		MostToLeast,
 	}
 
-	#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+	#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 	pub struct Annealing {
 		pub main_iterations: u64, //MI
 		pub ft_iterations: u64, //II
@@ -344,13 +345,16 @@ pub mod meta {
 		pub cooling_factor: f64, //RC
 	}
 
-	#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+	#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 	pub struct Parameters {
 		pub recycle: Recycle, //IV
 		pub clearing: Clearing, //MD
 		pub reorder: Reorder, //ChV
 		pub realloc: Realloc, //MV
 		pub annealing: Annealing,
+		pub slowdown: f64s,
+		pub weight_total: f64s,
+		pub weight_max: f64s,
 	}
 }
 
@@ -452,5 +456,69 @@ mod plow {
 				panic!("WTF?");
 			}
 		}
+	}
+	/// do the thing!
+	fn sno_plo<const DIRESPECT: bool>(g: &mut Graph, params: Parameters) -> Result<(), String> {
+		initial_allocation(g)?;
+		let mut cost_best = f64s::INFINITY;
+		let mut value_best = f64s::INFINITY;
+		let mut temperature: f64 = params.annealing.starting_temperature;
+		let mut ii = 0u64;
+		for _ in 0..params.annealing.main_iterations {
+			let mut prev_sol = vec![];
+			std::mem::swap(&mut g.sol, &mut prev_sol);
+			//Try to improve allocations
+			//TODO? change alloc
+			//TODO? change order
+			let mut cost_all = f64s::ZERO;
+			let mut cost_max = f64s::ZERO;
+			for i in 0..g.vehicles.len() {
+				solve_rpp::<DIRESPECT>(g, i);
+				//TODO mark done
+				let cost: f64s = g.sol[i].iter().map(|e| e.length * if g.allocations[i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum();
+				cost_all = cost_all + cost;
+				if cost > cost_max {
+					cost_max = cost;
+				}
+			}
+			let value = cost_all * params.weight_total + cost_max * params.weight_max;
+			//Accept solution for new allocations
+			if value < value_best || (value <= value_best && cost_max < cost_best) {
+				value_best = value;
+				cost_best = cost_max;
+				if params.clearing == Clearing::All {
+					//TODO revfromtour
+				}
+				prev_sol = g.sol.clone();
+			}
+			//Try to improve solution
+			let mut value_improv = value;
+			let mut cost_max_improv = cost_max;
+			match params.recycle {
+				Recycle::ExpensiveToCheap => {
+					//TODO improvesol
+				}
+				Recycle::No => {}
+			}
+			//TODO? if RS then revfromtour
+			//if the improved solution is actually better, or with some chance anyway, keep it
+			let rnd = 0.5;
+			if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rnd < (-(value_improv-value).f()/temperature).exp() {
+				value_best = value_improv;
+				cost_best = cost_max_improv;
+				if params.clearing == Clearing::All {
+					//TODO revfromtour
+				}
+			} else {
+				g.sol = prev_sol
+			}
+			//update the temperature
+			ii += 1;
+			if ii >= params.annealing.ft_iterations {
+				ii = 0;
+				temperature *= params.annealing.cooling_factor;
+			}
+		}
+		Ok(())
 	}
 }
