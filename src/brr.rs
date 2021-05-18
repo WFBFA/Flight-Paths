@@ -148,7 +148,7 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 
 /// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, ave: Vec<Rc<Edge>>) -> Option<Path> {
-	log::trace!("🚲");
+	// log::trace!("🚲");
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
@@ -431,13 +431,13 @@ pub mod plow {
 					}
 				})
 			} {
-				log::trace!("{} @ {}", v, y);
+				// log::trace!("{} @ {}", v, y);
 				let inj = super::bicycle::<DIRESPECT>(&g.edges, v, sol.clone()).unwrap();
-				log::trace!("infl8ting with {:?}", inj.len());
+				// log::trace!("infl8ting with {:?}", inj.len());
 				for e in &inj {
 					alloc.remove(e);
 				}
-				log::trace!("remaining: {:?}", alloc.len());
+				// log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
 			/*
 			} else if let Some((v, y, u)) = {
@@ -471,7 +471,7 @@ pub mod plow {
 				}
 			*/
 			} else {
-				log::warn!("Uh oh! Some of allocated sections ({}) aren't reachable!", alloc.len());
+				log::warn!("Uh oh! Some of allocated sections aren't reachable!: {:?}", alloc);
 				break;
 			}
 		}
@@ -558,6 +558,7 @@ pub mod plow {
 			match params.recycle {
 				Recycle::ExpensiveToCheap => {
 					let mut vycles: Vec<Vec<_>> = g.sol.iter().zip(g.vehicles.iter()).map(|(path, n0)| super::path_shmlop(path, n0).into_iter().map(|(v, _)| v.clone()).collect()).collect();
+					log::trace!(" costs: {:?}", costs);
 					for i in 0..vs {
 						'nexc: for j in (i+1)..vs {
 							let (i, j) = if costs[order[i]] > costs[order[j]] { (order[i], order[j]) } else { (order[j], order[i]) };
@@ -568,7 +569,7 @@ pub mod plow {
 											if vycles[i][iv] == vycles[i][iu] {
 												// [i][iu..=iv] <=> [j][ju..=ju]
 												// same as
-												// [i][iu..iv] => [j][ju..ju]
+												log::trace!("  [{}][{}..{}] => [{}][{}..{}]", i, iu, iv, j, ju, ju);
 												let mine: Vec<_> = g.sol[i].splice(iu..iv, vec![]).collect();
 												g.sol[j].splice(ju..ju, mine);
 												let mine: Vec<_> = vycles[i].splice(iu..iv, vec![]).collect();
