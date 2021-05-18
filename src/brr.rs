@@ -148,6 +148,7 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 
 /// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, ave: Vec<Rc<Edge>>) -> Option<Path> {
+	log::trace!("🚲");
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
@@ -430,15 +431,16 @@ pub mod plow {
 					}
 				})
 			} {
+				log::trace!("{} @ {}", v, y);
 				let inj = super::bicycle::<DIRESPECT>(&g.edges, v, sol.clone()).unwrap();
-				// log::trace!("infl8ting with {:?}", inj.len());
+				log::trace!("infl8ting with {:?}", inj.len());
 				for e in &inj {
 					alloc.remove(e);
 				}
-				// log::trace!("remaining: {:?}", alloc.len());
+				log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
 			} else if let Some((v, y, u)) = {
-				// log::trace!("attempting to reconnect...");
+				log::trace!("attempting to reconnect...");
 				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
 				let us: Vec<_> = us.into_iter().map(|u| (u.clone(), g.nodes.get(u).unwrap().clone())).collect();
 				let vs = super::path_shmlop(sol, n);
@@ -447,6 +449,7 @@ pub mod plow {
 					.min_by_key(|((_, uc), (_, (vc, _)))| f64s::try_from(uc.distance(vc)).unwrap())
 					.map(|((u, _), (v, (_, y)))| (v, y, u))
 			} {
+				log::trace!("connecting {} to {}", v, u);
 				if let Some(inj) = match (super::pathfind::<DIRESPECT>(&g.edges, &v, &u), super::bicycle::<DIRESPECT>(&g.edges, &u, sol.clone()), super::pathfind::<DIRESPECT>(&g.edges, &u, &v)) {
 					(Some(mut p1), Some(mut p2), Some(mut p3)) => {
 						p1.append(&mut p2);
@@ -455,11 +458,11 @@ pub mod plow {
 					},
 					_ => None
 				} {
-					// log::trace!("infl8ting with {:?}", inj.len());
+					log::trace!("infl8ting with {:?}", inj);
 					for e in &inj {
 						alloc.remove(e);
 					}
-					// log::trace!("remaining: {:?}", alloc.len());
+					log::trace!("remaining: {:?}", alloc.len());
 					g.sol[i].splice(y..y, inj);
 				} else {
 					log::warn!("Uh oh! Some of allocated sections aren't reachable!");
