@@ -439,6 +439,7 @@ pub mod plow {
 				}
 				log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
+			/*
 			} else if let Some((v, y, u)) = {
 				log::trace!("attempting to reconnect...");
 				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
@@ -468,6 +469,7 @@ pub mod plow {
 					log::warn!("Uh oh! Some of allocated sections aren't reachable!");
 					break;
 				}
+			*/
 			} else {
 				panic!("WTF?");
 			}
