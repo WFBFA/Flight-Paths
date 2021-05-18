@@ -50,6 +50,39 @@ fn main() -> std::io::Result<()> {
 										.required(true)
 										.multiple(true)
 										.help("Let it snow let it snow let it go")))
+							.subcommand(SubCommand::with_name("plow")
+								.about("Plow dat snow!")
+								.arg(Arg::with_name("road-graph")
+										.takes_value(true)
+										.required(true)
+										.index(1)
+										.help("Road Graph JSON"))
+								.arg(Arg::with_name("snow")
+										.takes_value(true)
+										.required(true)
+										.index(2)
+										.help("Snow status"))
+								.arg(Arg::with_name("vehicles")
+										.takes_value(true)
+										.required(true)
+										.index(3)
+										.help("Vehicles configuration"))
+								.arg(Arg::with_name("meta")
+										.takes_value(true)
+										.required(true)
+										.index(4)
+										.help("Meta parameters"))
+								.arg(Arg::with_name("output")
+										.takes_value(true)
+										.required(true)
+										.index(5)
+										.help("Output JSON"))
+								.arg(Arg::with_name("snow-d")
+										.short("d")
+										.takes_value(true)
+										.default_value("0")
+										.validator(|s| s.parse::<f64>().map(|_| ()).map_err(|e| e.to_string()))
+										.help("Default snow depth")))
 							.subcommand(SubCommand::with_name("geojson")
 								.about("Convert anything into GeoJSONs")
 								.arg(Arg::with_name("road-graph")
@@ -85,6 +118,16 @@ fn main() -> std::io::Result<()> {
 		}
 		log::info!("Loaded ❄");
 		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &brr::merge_snow_statuses(snu.into_iter().flatten())).unwrap();
+	} else if let Some(matches) = matches.subcommand_matches("plow") {
+		log::trace!("tracing enabled");
+		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
+		let snow: data::SnowStatuses = serde_json::from_reader(&std::fs::File::open(matches.value_of("snow").unwrap())?).expect("Snow status config invalid JSON");
+		let vehicles: data::VehiclesConfiguration = serde_json::from_reader(&std::fs::File::open(matches.value_of("vehicles").unwrap())?).expect("Meta parameters invalid JSON");
+		let params: brr::meta::Parameters = serde_json::from_reader(&std::fs::File::open(matches.value_of("meta").unwrap())?).expect("Meta parameters invalid JSON");
+		log::info!("Loaded configuration");
+		let paths = brr::plow::solve(roads, snow, matches.value_of("snow-d").map(|f| f.parse().unwrap()), vehicles, params).unwrap();
+		log::info!("Constructed paths");
+		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
 	} else if let Some(matches) = matches.subcommand_matches("geojson") {
 		let roads: data::RoadGraphNodes = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
 		let pref = matches.value_of("prefix").unwrap();

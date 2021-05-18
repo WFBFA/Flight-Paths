@@ -358,14 +358,14 @@ pub mod meta {
 	}
 }
 
-mod plow {
+pub mod plow {
 	use crate::*;
 	use data::Distance;
 	use itertools::Itertools;
 	use rand::{Rng, prelude::SliceRandom};
 	use super::meta::*;
 
-	use std::{convert::TryFrom, mem::swap};
+	use std::{convert::{TryFrom, TryInto}, mem::swap};
 	use std::collections::{HashSet, HashMap};
 
 	type Edge = std::rc::Rc<super::Edge>;
@@ -379,9 +379,13 @@ mod plow {
 	}
 	impl Graph {
 		/// merely constructs a new instance and initializes snow information, does not allocate or any of that
-		fn new(g: super::Graph, nodes: data::RoadGraphNodes, snow: data::SnowStatuses, vehicles: Vec<NodeId>) -> Self {
+		fn new(g: super::Graph, nodes: data::RoadGraphNodes, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: Vec<NodeId>) -> Self {
 			Self {
-				snowy: snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| super::graph_find_edge(&g, &s.p1, &s.p2, s.discriminator.as_ref()).expect("Snow status edge not found")).collect(),
+				snowy: if snow_d.is_some() {
+					g.values().flatten().cloned().collect()
+				} else {
+					snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| super::graph_find_edge(&g, &s.p1, &s.p2, s.discriminator.as_ref()).expect("Snow status edge not found")).collect()
+				},
 				allocations: vehicles.iter().map(|_| HashSet::new()).collect(),
 				sol: vehicles.iter().map(|_| Vec::new()).collect(),
 				nodes: nodes.nodes.into_iter().map(|n| (n.id, n.coordinates)).collect(),
@@ -575,5 +579,16 @@ mod plow {
 			}
 		}
 		Ok(())
+	}
+	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: Parameters) -> Result<data::Paths, String> {
+		let sns: Vec<NodeId> = vehicles.road.iter().flat_map(|l| roads.nodes.locate(l)).collect();
+		if sns.len() < vehicles.road.len() {
+			return Err("Failed to locate positions to the road graph".to_string());
+		}
+		log::info!("Located vehicles");
+		let nodes = roads.nodes.clone();
+		let mut g = Graph::new(roads.try_into()?, nodes, snow, snow_d, sns);
+		sno_plo::<false>(&mut g, params)?;
+		Ok(g.sol.into_iter().zip(g.vehicles.into_iter()).map(|(path, n0)| super::path_shmlop(&path, &n0).into_iter().map(|(node, discriminator)| data::PathSegment { node: node.clone(), discriminator: discriminator.map(Clone::clone) }).collect()).collect())
 	}
 }
