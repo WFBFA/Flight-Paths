@@ -497,14 +497,18 @@ mod plow {
 				},
 				Reorder::RandomReorder => order.shuffle(&mut rng),
 			}
+			//Provide new solutions
 			let mut cost_all = f64s::ZERO;
 			let mut cost_max = f64s::ZERO;
+			let mut costs = Vec::new();
+			costs.resize(vs, f64s::ZERO);
 			for i in &order {
 				solve_rpp::<DIRESPECT>(g, *i);
 				if params.clearing == Clearing::All {
 					sol_to_alloc(g); //TODO we can do better tho!
 				}
 				let cost: f64s = g.sol[*i].iter().map(|e| e.length * if g.allocations[*i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum();
+				costs[*i] = cost;
 				cost_all = cost_all + cost;
 				if cost > cost_max {
 					cost_max = cost;
@@ -525,13 +529,33 @@ mod plow {
 			let mut cost_max_improv = cost_max;
 			match params.recycle {
 				Recycle::ExpensiveToCheap => {
-					//TODO improvesol
+					let mut vycles: Vec<Vec<_>> = g.sol.iter().zip(g.vehicles.iter()).map(|(path, n0)| super::path_shmlop(path, n0).into_iter().map(|(v, _)| v.clone()).collect()).collect();
+					for i in 0..vs {
+						'nexc: for j in (i+1)..vs {
+							let (i, j) = if costs[i] > costs[j] { (order[i], order[j]) } else { (order[j], order[i]) };
+							for iu in 0..vycles[i].len() {
+								for ju in 0..vycles[j].len() {
+									if vycles[i][iu] == vycles[j][ju] {
+										for iv in (iu+1)..vycles[i].len() {
+											if vycles[i][iv] == vycles[i][iu] {
+												// [i][iu..=iv] <=> [j][ju..=ju]
+												// same as
+												// [i][iu..iv] => [j][ju..ju]
+												let mine: Vec<_> = g.sol[i].splice(iu..iv, vec![]).collect();
+												g.sol[j].splice(ju..ju, mine);
+												let mine: Vec<_> = vycles[i].splice(iu..iv, vec![]).collect();
+												vycles[j].splice(ju..ju, mine);
+												//don't update costs to avoid swap-backs idk
+												continue 'nexc;
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 				Recycle::No => {}
-			}
-			let rs = params.recycle == Recycle::ExpensiveToCheap;
-			if rs {
-				sol_to_alloc(g);
 			}
 			//if the improved solution is actually better, or with some chance anyway, keep it
 			if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rng.gen_range(0.0..1.0) < (-(value_improv-value).f()/temperature).exp() {
