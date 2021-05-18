@@ -613,7 +613,7 @@ pub mod plow {
 		log::info!("Located vehicles");
 		log::trace!("{:?}", sns);
 		let nodes = roads.nodes.clone();
-		let mut g = Graph::new(roads.try_into()?, nodes, snow, snow_d, sns);
+		let mut g = Graph::new(super::kreek::<false>(roads.try_into()?)?, nodes, snow, snow_d, sns);
 		log::trace!("Constructed graph with {} nodes, {}/{} snowed segments, and {} vehicles", g.nodes.len(), g.snowy.len(), super::graph_edges(&g.edges), g.vehicles.len());
 		sno_plo::<false>(&mut g, params)?;
 		Ok(g.sol.into_iter().zip(g.vehicles.into_iter()).map(|(path, n0)| super::path_shmlop(&path, &n0).into_iter().map(|(node, discriminator)| data::PathSegment { node: node.clone(), discriminator: discriminator.map(Clone::clone) }).collect()).collect())
