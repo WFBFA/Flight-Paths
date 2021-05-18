@@ -414,6 +414,7 @@ pub mod plow {
 	/// solve rural postman problem for a single vehicle
 	fn solve_rpp<const DIRESPECT: bool>(g: &mut Graph, i: usize){
 		let mut alloc = g.allocations[i].clone();
+		// log::trace!("starting with: {:?}", alloc.len());
 		let n = &g.vehicles[i];
 		g.sol[i].clear();
 		while !alloc.is_empty() {
@@ -430,11 +431,14 @@ pub mod plow {
 				})
 			} {
 				let inj = super::bicycle::<DIRESPECT>(&g.edges, v, sol.clone()).unwrap();
+				// log::trace!("infl8ting with {:?}", inj.len());
 				for e in &inj {
 					alloc.remove(e);
 				}
+				// log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
 			} else if let Some((v, y, u)) = {
+				// log::trace!("attempting to reconnect...");
 				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
 				let us: Vec<_> = us.into_iter().map(|u| (u.clone(), g.nodes.get(u).unwrap().clone())).collect();
 				let vs = super::path_shmlop(sol, n);
@@ -451,12 +455,15 @@ pub mod plow {
 					},
 					_ => None
 				} {
+					// log::trace!("infl8ting with {:?}", inj.len());
 					for e in &inj {
 						alloc.remove(e);
 					}
+					// log::trace!("remaining: {:?}", alloc.len());
 					g.sol[i].splice(y..y, inj);
 				} else {
-					panic!("Uh oh! Some of allocated sections aren't reachable!");
+					log::warn!("Uh oh! Some of allocated sections aren't reachable!");
+					break;
 				}
 			} else {
 				panic!("WTF?");
