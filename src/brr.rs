@@ -486,6 +486,11 @@ pub mod plow {
 		let mut ii = 0u64;
 		let vs = g.vehicles.len();
 		let mut order: Vec<_> = (0..vs).collect();
+		macro_rules! cycle_cost_compute {
+			($i:expr) => {
+				g.sol[$i].iter().map(|e| e.length * if g.allocations[$i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum()
+			}
+		}
 		for _ in 0..params.annealing.main_iterations {
 			let mut prev_sol = vec![];
 			swap(&mut g.sol, &mut prev_sol);
@@ -511,13 +516,14 @@ pub mod plow {
 				if params.clearing == Clearing::All {
 					sol_to_alloc(g); //TODO we can do better tho!
 				}
-				let cost: f64s = g.sol[*i].iter().map(|e| e.length * if g.allocations[*i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum();
+				let cost: f64s = cycle_cost_compute!(*i);
 				costs[*i] = cost;
 				cost_all = cost_all + cost;
 				if cost > cost_max {
 					cost_max = cost;
 				}
 			}
+			let (cost_all, cost_max) = (cost_all, cost_max); //freeze
 			let value = cost_all * params.weight_total + cost_max * params.weight_max;
 			//Accept solution for new allocations
 			if value < value_best || (value <= value_best && cost_max < cost_best) {
@@ -529,8 +535,6 @@ pub mod plow {
 				prev_sol = g.sol.clone();
 			}
 			//Try to improve solution
-			let mut value_improv = value;
-			let mut cost_max_improv = cost_max;
 			match params.recycle {
 				Recycle::ExpensiveToCheap => {
 					let mut vycles: Vec<Vec<_>> = g.sol.iter().zip(g.vehicles.iter()).map(|(path, n0)| super::path_shmlop(path, n0).into_iter().map(|(v, _)| v.clone()).collect()).collect();
@@ -558,18 +562,29 @@ pub mod plow {
 							}
 						}
 					}
+					let mut cost_all_improv = f64s::ZERO;
+					let mut cost_max_improv = f64s::ZERO;
+					for i in 0..vs {
+						let cost: f64s = cycle_cost_compute!(i);
+						costs[i] = cost;
+						cost_all_improv = cost_all_improv + cost;
+						if cost > cost_max {
+							cost_max_improv = cost;
+						}
+					}
+					let value_improv = cost_all_improv * params.weight_total + cost_max_improv * params.weight_max;
+					//if the improved solution is actually better, or with some chance anyway, keep it
+					if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rng.gen_range(0.0..1.0) < (-(value_improv-value).f()/temperature).exp() {
+						value_best = value_improv;
+						cost_best = cost_max_improv;
+						if params.clearing == Clearing::All {
+							sol_to_alloc(g);
+						}
+					} else {
+						g.sol = prev_sol
+					}
 				}
 				Recycle::No => {}
-			}
-			//if the improved solution is actually better, or with some chance anyway, keep it
-			if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || rng.gen_range(0.0..1.0) < (-(value_improv-value).f()/temperature).exp() {
-				value_best = value_improv;
-				cost_best = cost_max_improv;
-				if params.clearing == Clearing::All {
-					sol_to_alloc(g);
-				}
-			} else {
-				g.sol = prev_sol
 			}
 			//update the temperature
 			ii += 1;
