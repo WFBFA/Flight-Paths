@@ -471,7 +471,8 @@ pub mod plow {
 				}
 			*/
 			} else {
-				panic!("WTF?");
+				log::warn!("Uh oh! Some of allocated sections ({}) aren't reachable!", alloc.len());
+				break;
 			}
 		}
 	}
