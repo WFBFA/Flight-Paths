@@ -174,7 +174,7 @@ fn graph_edges(g: &Graph) -> usize {
 }
 
 fn graph_find_edge(g: &Graph, p1: &NodeId, p2: &NodeId, discriminator: Option<&NodeId>) -> Option<Rc<Edge>> {
-	g.get(p1).and_then(|es| es.iter().find(|e| e.other(p1) == p2 && e.discriminator.as_ref() == discriminator)).map(Clone::clone)
+	g.get(p1).and_then(|es| es.iter().find(|e| e.other(p1) == p2 && e.discriminator.as_ref() == discriminator && e.iidx == 0)).map(Clone::clone)
 }
 
 fn graph_find_edges(g: &Graph, p1: &NodeId, p2: &NodeId) -> Vec<Rc<Edge>> {
