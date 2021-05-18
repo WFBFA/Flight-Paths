@@ -420,7 +420,7 @@ pub mod plow {
 			let sol = &g.sol[i];
 			if let Some((v, y)) = {
 				let shmlop = super::path_shmlop(sol, n);
-				(0..shmlop.len()-1).find_map(|i| {
+				(0..shmlop.len()).find_map(|i| {
 					let (v, _) = shmlop[i];
 					if g.edges.get(v).unwrap().iter().any(|e| !sol.contains(e) && alloc.contains(e)) {
 						Some((v, i))
