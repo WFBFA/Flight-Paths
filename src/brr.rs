@@ -324,13 +324,16 @@ pub mod meta {
 
 mod plow {
 	use crate::*;
+	use data::Distance;
 	use super::meta::*;
 
+	use std::convert::TryFrom;
 	use std::collections::HashSet;
 
 	type Edge = std::rc::Rc<super::Edge>;
 	struct Graph {
-		nodes: indexmap::IndexMap<NodeId, Vec<Edge>>,
+		nodes: indexmap::IndexMap<NodeId, (f64, f64)>,
+		edges: indexmap::IndexMap<NodeId, Vec<Edge>>,
 		snowy: HashSet<Edge>,
 		vehicles: Vec<NodeId>,
 		allocations: Vec<HashSet<Edge>>,
@@ -338,14 +341,31 @@ mod plow {
 	}
 	impl Graph {
 		/// merely constructs a new instance and initializes snow information, does not allocate or any of that
-		fn new(g: super::Graph, snow: data::SnowStatuses, vehicles: Vec<NodeId>) -> Self {
+		fn new(g: super::Graph, nodes: data::RoadGraphNodes, snow: data::SnowStatuses, vehicles: Vec<NodeId>) -> Self {
 			Self {
 				snowy: snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| super::graph_find_edge(&g, &s.p1, &s.p2, s.discriminator.as_ref()).expect("Snow status edge not found")).collect(),
 				allocations: vehicles.iter().map(|_| HashSet::new()).collect(),
 				sol: vehicles.iter().map(|_| Vec::new()).collect(),
+				nodes: nodes.nodes.into_iter().map(|n| (n.id, n.coordinates)).collect(),
 				vehicles,
-				nodes: g,
+				edges: g,
 			}
 		}
+	}
+	/// allocates all snowy edges to some vehicle
+	/// uses positions of vehicles as gravicenters of allocation clusters
+	fn initial_allocation(g: &mut Graph) -> Result<(), String> {
+		let vcoords: Vec<_> = g.vehicles.iter().map(|l| g.nodes.get(l).unwrap().clone()).collect();
+		let closest = |c: &(f64, f64)| (0..vcoords.len()).zip(vcoords.iter()).min_by_key(|(_, c2)| f64s::try_from(c.distance(*c2)).unwrap()).unwrap().0;
+		for e in &g.snowy {
+			let lv1 = closest(g.nodes.get(&e.p1).unwrap());
+			let lv2 = closest(g.nodes.get(&e.p2).unwrap());
+			if lv1 == lv2 || g.allocations[lv2].len() > g.allocations[lv1].len() {
+				&mut g.allocations[lv1]
+			} else {
+				&mut g.allocations[lv2]
+			}.insert(e.clone());
+		}
+		Ok(())
 	}
 }

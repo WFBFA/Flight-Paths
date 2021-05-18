@@ -4,7 +4,7 @@ use crate::*;
 
 use serde::*;
 
-trait Distance {
+pub trait Distance {
 	type Measure;
 	fn distance(&self, other: &Self) -> Self::Measure;
 }
