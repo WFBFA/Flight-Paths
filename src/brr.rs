@@ -149,13 +149,13 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 /// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, ave: Vec<Rc<Edge>>) -> Option<Path> {
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
-	q.push((n0.clone(), ave), f64s::ZERO);
+	q.push((n0.clone(), vec![]), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
 		if &n == n0 && path.len() > 0 {
 			return Some(path);
 		}
 		for e in g.get(&n).unwrap() {
-			if !path.contains(e) && (!DIRESPECT || !e.directed || e.p1 == n) {
+			if !ave.contains(e) && !path.contains(e) && (!DIRESPECT || !e.directed || e.p1 == n) {
 				let mut path = path.clone();
 				path.push(e.clone());
 				q.push((e.other(&n).clone(), path),  d + e.length);
