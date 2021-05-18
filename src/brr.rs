@@ -1,4 +1,4 @@
-use std::{cmp::max, convert::{TryFrom, TryInto}, rc::Rc};
+use std::{cmp::max, collections::HashMap, convert::{TryFrom, TryInto}, rc::Rc};
 
 use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
@@ -147,9 +147,9 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 }
 
 /// Find shortest non-trivial cycle on a vertex
-fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId) -> Option<Path> {
+fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, ave: Vec<Rc<Edge>>) -> Option<Path> {
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
-	q.push((n0.clone(), vec![]), f64s::ZERO);
+	q.push((n0.clone(), ave), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
 		if &n == n0 && path.len() > 0 {
 			return Some(path);
@@ -159,6 +159,38 @@ fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId) -> Option<Path> {
 				let mut path = path.clone();
 				path.push(e.clone());
 				q.push((e.other(&n).clone(), path),  d + e.length);
+			}
+		}
+	}
+	None
+}
+
+/// find shortest path between 2 points
+fn pathfind<const DIRESPECT: bool>(g: &Graph, n1: &NodeId, n2: &NodeId) -> Option<Path> {
+	let mut dp: HashMap<NodeId, (f64s, Option<Rc<Edge>>)> = HashMap::new();
+	dp.insert(n1.clone(), (f64s::ZERO, None));
+	let mut q = PriorityQueue::new();
+	q.push(n1.clone(), f64s::ZERO);
+	while let Some((u, _)) = q.pop() {
+		if &u == n2 {
+			let mut path = Vec::new();
+			let mut v = &u;
+			while let Some((_, Some(e))) = dp.get(v) {
+				v = e.other(v);
+				path.push(e.clone());
+			}
+			path.reverse();
+			return Some(path);
+		}
+		let d = dp.get(&u).unwrap().0;
+		for e in g.get(&u).unwrap() {
+			if !DIRESPECT || !e.directed || e.p1 == u {
+				let v = e.other(&u);
+				let d = d + e.length;
+				if dp.get(v).map_or(true, |(vd, _)| vd > &d) {
+					dp.insert(v.clone(), (d, Some(e.clone())));
+					q.push(v.clone(), -d);
+				}
 			}
 		}
 	}
@@ -215,7 +247,7 @@ fn bl33p<const DIRESPECT: bool>(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 			Some((n, 0))
 		} {
 			// log::trace!("inflating {} ({})", v, g.get(v).unwrap().len());
-			let inj = bicycle::<DIRESPECT>(&g, v).unwrap();
+			let inj = bicycle::<DIRESPECT>(&g, v, Vec::new()).unwrap();
 			// log::trace!("with {}", inj.len());
 			for e in &inj {
 				e.remove(&mut g);
@@ -325,10 +357,11 @@ pub mod meta {
 mod plow {
 	use crate::*;
 	use data::Distance;
+	use itertools::Itertools;
 	use super::meta::*;
 
 	use std::convert::TryFrom;
-	use std::collections::HashSet;
+	use std::collections::{HashSet, HashMap};
 
 	type Edge = std::rc::Rc<super::Edge>;
 	struct Graph {
@@ -367,5 +400,57 @@ mod plow {
 			}.insert(e.clone());
 		}
 		Ok(())
+	}
+	/// solve rural postman problem for a single vehicle
+	fn solve_rpp<const DIRESPECT: bool>(g: &mut Graph, i: usize){
+		let mut alloc = g.allocations[i].clone();
+		let n = &g.vehicles[i];
+		g.sol[i].clear();
+		while !alloc.is_empty() {
+			let sol = &g.sol[i];
+			if let Some((v, y)) = {
+				let shmlop = super::path_shmlop(sol, n);
+				(0..shmlop.len()-1).find_map(|i| {
+					let (v, _) = shmlop[i];
+					if g.edges.get(v).unwrap().iter().any(|e| !sol.contains(e) && alloc.contains(e)) {
+						Some((v, i))
+					} else {
+						None
+					}
+				})
+			} {
+				let inj = super::bicycle::<DIRESPECT>(&g.edges, v, sol.clone()).unwrap();
+				for e in &inj {
+					alloc.remove(e);
+				}
+				g.sol[i].splice(y..y, inj);
+			} else if let Some((v, y, u)) = {
+				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
+				let us: Vec<_> = us.into_iter().map(|u| (u.clone(), g.nodes.get(u).unwrap().clone())).collect();
+				let vs = super::path_shmlop(sol, n);
+				let vs: Vec<_> = (0..vs.len()).zip(vs.into_iter()).map(|(i, (v, _))| (v.clone(), (g.nodes.get(v).unwrap().clone(), i))).collect();
+				us.into_iter().cartesian_product(vs)
+					.min_by_key(|((_, uc), (_, (vc, _)))| f64s::try_from(uc.distance(vc)).unwrap())
+					.map(|((u, _), (v, (_, y)))| (v, y, u))
+			} {
+				if let Some(inj) = match (super::pathfind::<DIRESPECT>(&g.edges, &v, &u), super::bicycle::<DIRESPECT>(&g.edges, &u, sol.clone()), super::pathfind::<DIRESPECT>(&g.edges, &u, &v)) {
+					(Some(mut p1), Some(mut p2), Some(mut p3)) => {
+						p1.append(&mut p2);
+						p1.append(&mut p3);
+						Some(p1)
+					},
+					_ => None
+				} {
+					for e in &inj {
+						alloc.remove(e);
+					}
+					g.sol[i].splice(y..y, inj);
+				} else {
+					panic!("Uh oh! Some of allocated sections aren't reachable!");
+				}
+			} else {
+				panic!("WTF?");
+			}
+		}
 	}
 }
