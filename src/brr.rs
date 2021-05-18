@@ -523,6 +523,7 @@ pub mod plow {
 			let mut costs = Vec::new();
 			costs.resize(vs, f64s::ZERO);
 			for i in &order {
+				log::trace!(" solving {}", i);
 				solve_rpp::<DIRESPECT>(g, *i);
 				if params.clearing == Clearing::All {
 					sol_to_alloc(g); //TODO we can do better tho!
