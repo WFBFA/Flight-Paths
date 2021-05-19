@@ -14,6 +14,7 @@ pub type NodeId = Cow<'static, str>;
 #[serde(untagged)]
 enum Wut {
 	Paths(data::Paths),
+	Vehicles(data::VehiclesConfiguration),
 	Snow(data::SnowStatuses),
 }
 
@@ -158,6 +159,10 @@ fn main() -> std::io::Result<()> {
 				for (i, path) in (0..paths.len()).zip(paths.into_iter()) {
 					serde_json::to_writer(&std::fs::File::create(format!("{}.{}.geojson", pref, i))?, &gj::path_to_geojson(&g, path)).unwrap();
 				}
+			}
+			Wut::Vehicles(vc) => {
+				serde_json::to_writer(&std::fs::File::create(format!("{}.road.geojson", pref))?, &gj::locations_to_geojson(&roads.nodes, vc.road)).unwrap();
+				serde_json::to_writer(&std::fs::File::create(format!("{}.sidewalk.geojson", pref))?, &gj::locations_to_geojson(&roads.nodes, vc.sidewalk)).unwrap();
 			}
 			Wut::Snow(snows) => {
 				serde_json::to_writer(&std::fs::File::create(format!("{}.geojson", pref))?, &gj::snows_to_geofeatures(&roads, snows)).unwrap();

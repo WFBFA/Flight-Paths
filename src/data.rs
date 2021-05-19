@@ -64,6 +64,12 @@ impl RoadGraphNodes {
 			Location::Node(n) => Some(n.clone()),
 		}
 	}
+	pub fn dislocate(&self, l: &Location) -> geo::Geometry<f64> {
+		match l {
+			Location::Coordinates(lon, lat) => geo::Point::from((*lon, *lat)).into(),
+			Location::Node(nid) => self.nodes.iter().find(|n| &n.id == nid).unwrap().into(),
+		}
+	}
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]

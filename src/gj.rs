@@ -1,6 +1,6 @@
 use crate::*;
 use data::*;
-use geo::intersects::Intersects;
+use geo::{GeometryCollection, intersects::Intersects};
 
 use std::{collections::HashSet, convert::{TryFrom, TryInto}};
 use geojson::*;
@@ -10,6 +10,20 @@ pub type Nodes = IndexMap<NodeId, Node>;
 
 pub fn roads_to_nodes(g: RoadGraphNodes) -> Nodes {
 	g.nodes.into_iter().map(|n| (n.id.clone(), n)).collect()
+}
+
+pub fn locations_to_geojson(g: &RoadGraphNodes, l: Vec<data::Location>) -> FeatureCollection {
+	FeatureCollection {
+		features: l.into_iter().map(|l| Feature {
+			geometry: Some((&g.dislocate(&l)).try_into().unwrap()),
+			properties: None,
+			bbox: None,
+			foreign_members: None,
+			id: None
+		}).collect(),
+		bbox: None,
+		foreign_members: None,
+	}
 }
 
 pub fn path_to_geojson(g: &Nodes, path: Vec<PathSegment>) -> Geometry {
