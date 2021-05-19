@@ -4,6 +4,7 @@ mod f64nn;
 use clap::{App, Arg, SubCommand, crate_version};
 use f64nn::*;
 mod data;
+mod graph;
 mod brr;
 mod gj;
 
