@@ -147,7 +147,7 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 }
 
 /// Find shortest non-trivial cycle on a vertex
-fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, ave: Vec<Rc<Edge>>) -> Option<Path> {
+fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
 	// log::trace!("🚲");
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
@@ -156,7 +156,7 @@ fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, ave: Vec<Rc<Edge>>) ->
 			return Some(path);
 		}
 		for e in g.get(&n).unwrap() {
-			if !ave.contains(e) && !path.contains(e) && (!DIRESPECT || !e.directed || e.p1 == n) {
+			if !path.contains(e) && (!DIRESPECT || !e.directed || e.p1 == n) && pred.map_or(true, |f| f(e)) {
 				let mut path = path.clone();
 				path.push(e.clone());
 				q.push((e.other(&n).clone(), path),  d + e.length);
@@ -167,7 +167,7 @@ fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, ave: Vec<Rc<Edge>>) ->
 }
 
 /// find shortest path between 2 points
-fn pathfind<const DIRESPECT: bool>(g: &Graph, n1: &NodeId, n2: &NodeId) -> Option<Path> {
+fn pathfind<const DIRESPECT: bool>(g: &Graph, n1: &NodeId, n2: &NodeId, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
 	let mut dp: HashMap<NodeId, (f64s, Option<Rc<Edge>>)> = HashMap::new();
 	dp.insert(n1.clone(), (f64s::ZERO, None));
 	let mut q = PriorityQueue::new();
@@ -185,7 +185,7 @@ fn pathfind<const DIRESPECT: bool>(g: &Graph, n1: &NodeId, n2: &NodeId) -> Optio
 		}
 		let d = dp.get(&u).unwrap().0;
 		for e in g.get(&u).unwrap() {
-			if !DIRESPECT || !e.directed || e.p1 == u {
+			if (!DIRESPECT || !e.directed || e.p1 == u) && pred.map_or(true, |f| f(e)) {
 				let v = e.other(&u);
 				let d = d + e.length;
 				if dp.get(v).map_or(true, |(vd, _)| vd > &d) {
@@ -248,7 +248,7 @@ fn bl33p<const DIRESPECT: bool>(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 			Some((n, 0))
 		} {
 			// log::trace!("inflating {} ({})", v, g.get(v).unwrap().len());
-			let inj = bicycle::<DIRESPECT>(&g, v, Vec::new()).unwrap();
+			let inj = bicycle::<DIRESPECT>(&g, v, None).unwrap();
 			// log::trace!("with {}", inj.len());
 			for e in &inj {
 				e.remove(&mut g);
@@ -432,14 +432,13 @@ pub mod plow {
 				})
 			} {
 				// log::trace!("{} @ {}", v, y);
-				let inj = super::bicycle::<DIRESPECT>(&g.edges, v, sol.clone()).unwrap();
+				let inj = super::bicycle::<DIRESPECT>(&g.edges, v, Some(&|e| !sol.contains(e))).unwrap();
 				// log::trace!("infl8ting with {:?}", inj.len());
 				for e in &inj {
 					alloc.remove(e);
 				}
 				// log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
-			/*
 			} else if let Some((v, y, u)) = {
 				log::trace!("attempting to reconnect...");
 				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
@@ -451,13 +450,20 @@ pub mod plow {
 					.map(|((u, _), (v, (_, y)))| (v, y, u))
 			} {
 				log::trace!("connecting {} to {}", v, u);
-				if let Some(inj) = match (super::pathfind::<DIRESPECT>(&g.edges, &v, &u), super::bicycle::<DIRESPECT>(&g.edges, &u, sol.clone()), super::pathfind::<DIRESPECT>(&g.edges, &u, &v)) {
-					(Some(mut p1), Some(mut p2), Some(mut p3)) => {
-						p1.append(&mut p2);
-						p1.append(&mut p3);
-						Some(p1)
-					},
-					_ => None
+				if let Some(inj) = if let Some(mut p1) = super::pathfind::<DIRESPECT>(&g.edges, &v, &u, Some(&|e| !sol.contains(e))) {
+					if let Some(mut p2) = super::bicycle::<DIRESPECT>(&g.edges, &u, Some(&|e| !sol.contains(e) && !p1.contains(e))) {
+						if let Some(mut p3) = super::pathfind::<DIRESPECT>(&g.edges, &u, &v,Some(&|e| !sol.contains(e) && !p1.contains(e) && !p2.contains(e))) {
+							p1.append(&mut p2);
+							p1.append(&mut p3);
+							Some(p1)
+						} else {
+							None
+						}
+					} else {
+						None
+					}
+				} else {
+					None
 				} {
 					log::trace!("infl8ting with {:?}", inj);
 					for e in &inj {
@@ -466,13 +472,11 @@ pub mod plow {
 					log::trace!("remaining: {:?}", alloc.len());
 					g.sol[i].splice(y..y, inj);
 				} else {
-					log::warn!("Uh oh! Some of allocated sections aren't reachable!");
+					log::warn!("Uh oh! Some of allocated sections aren't reachable!: {:?}", alloc);
 					break;
 				}
-			*/
 			} else {
-				log::warn!("Uh oh! Some of allocated sections aren't reachable!: {:?}", alloc);
-				break;
+				panic!("WTF?");
 			}
 		}
 	}
