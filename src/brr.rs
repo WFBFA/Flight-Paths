@@ -484,10 +484,12 @@ pub mod plow {
 	fn sol_to_alloc(g: &mut Graph){
 		for i in 0..g.sol.len() {
 			for e in &g.sol[i] {
-				if g.allocations[i].insert(e.clone()) {
-					for a in 0..g.allocations.len() {
-						if a != i {
-							g.allocations[a].remove(e);
+				if g.snowy.contains(e) {
+					if g.allocations[i].insert(e.clone()) {
+						for a in 0..g.allocations.len() {
+							if a != i {
+								g.allocations[a].remove(e);
+							}
 						}
 					}
 				}
