@@ -1,6 +1,8 @@
 use crate::*;
 use data::*;
+use geo::intersects::Intersects;
 
+use std::{collections::HashSet, convert::{TryFrom, TryInto}};
 use geojson::*;
 use indexmap::IndexMap;
 
@@ -12,4 +14,23 @@ pub fn roads_to_nodes(g: RoadGraphNodes) -> Nodes {
 
 pub fn path_to_geojson(g: &Nodes, path: Vec<PathSegment>) -> Geometry {
 	Geometry::new(Value::LineString(path.into_iter().flat_map(|PathSegment { node, .. }| g.get(&node).map(|node| vec![node.coordinates.0, node.coordinates.1])).collect()))
+}
+
+pub fn geofeatures_to_snow(g: &RoadGraph, feat: FeatureCollection) -> data::SnowStatuses {
+	let mut snow = Vec::new();
+	for f in feat.features {
+		if let (Some(depth), Some(geometry)) = (f.property("snow").and_then(|j| j.as_f64()), f.geometry) {
+			let geometry: geo::Geometry<f64> = geometry.value.try_into().unwrap();
+			let isect: HashSet<_> = g.nodes.nodes.iter().filter(|n| geometry.intersects(&geo::Geometry::<f64>::from(*n))).map(|n| &n.id).collect();
+			for e in g.roads.iter().filter(|e| isect.contains(&e.p1) || isect.contains(&e.p2)) {
+				snow.push(SnowStatusElement {
+					p1: e.p1.clone(),
+					p2: e.p2.clone(),
+					discriminator: e.discriminator.clone(),
+					depth: f64s::try_from(depth).unwrap(),
+				});
+			}
+		}
+	}
+	snow
 }

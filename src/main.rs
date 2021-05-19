@@ -16,6 +16,13 @@ enum Wut {
 	Paths(data::Paths),
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Debug)]
+#[serde(untagged)]
+enum SnuwDapg {
+	Formal(data::SnowStatuses),
+	Geo(geojson::FeatureCollection),
+}
+
 fn main() -> std::io::Result<()> {
 	env_logger::init_from_env(env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"));
 	let matches = App::new("Flight Paths Compute")
@@ -41,10 +48,15 @@ fn main() -> std::io::Result<()> {
 							)
 							.subcommand(SubCommand::with_name("snows")
 								.about("Merge multiple snow status updates")
-								.arg(Arg::with_name("output")
+								.arg(Arg::with_name("road-graph")
 										.takes_value(true)
 										.required(true)
 										.index(1)
+										.help("Road Graph JSON"))
+								.arg(Arg::with_name("output")
+										.takes_value(true)
+										.required(true)
+										.index(2)
 										.help("Merged snow status output JSON"))
 								.arg(Arg::with_name("snows")
 										.takes_value(true)
@@ -113,12 +125,17 @@ fn main() -> std::io::Result<()> {
 		log::info!("Constructed paths");
 		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
 	} else if let Some(matches) = matches.subcommand_matches("snows") {
-		let mut snu: Vec<data::SnowStatuses> = Vec::new();
+		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph invalid JSON");
+		log::info!("Loaded configuration");
+		let mut snu: Vec<SnuwDapg> = Vec::new();
 		for f in matches.values_of("snows").unwrap() {
 			snu.push(serde_json::from_reader(&std::fs::File::open(f)?).expect("Snow status invalid JSON"));
 		}
 		log::info!("Loaded ❄");
-		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &brr::merge_snow_statuses(snu.into_iter().flatten())).unwrap();
+		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &brr::merge_snow_statuses(snu.into_iter().map(|s| match s {
+			SnuwDapg::Formal(s) => s,
+			SnuwDapg::Geo(feat) => gj::geofeatures_to_snow(&roads, feat),
+		}).flatten())).unwrap();
 	} else if let Some(matches) = matches.subcommand_matches("plow") {
 		log::trace!("tracing enabled");
 		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");

@@ -39,6 +39,11 @@ pub struct Node {
 	pub id: NodeId,
 	pub coordinates: (f64, f64),
 }
+impl From<&Node> for geo::Geometry<f64> {
+	fn from(n: &Node) -> Self {
+		geo::Point::from(n.coordinates).into()
+	}
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RoadGraph {
