@@ -66,4 +66,21 @@ where
 	pub fn is_edge_empty(&self) -> bool {
 		self.edges.values().all(HashSet::is_empty)
 	}
+	/// Calculate combined degree of a vertex
+	pub fn degree<const DIRESPECT: bool>(&self, n: NId) -> isize {
+		if let Some(es) = self.get_node_edges(n) {
+			if DIRESPECT {
+				-(es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed()).count() as isize
+			} else {
+				es.len() as isize
+			}
+		} else {
+			0
+		}
+	}
+	/// Check whether given node does not prevent a graph from being eulirian
+	pub fn eulirian_compatible<const DIRESPECT: bool>(&self, n: NId) -> bool {
+		let d = self.degree::<DIRESPECT>(n);
+		d % 2 == 0 && (!DIRESPECT || d >= 0)
+	}
 }
