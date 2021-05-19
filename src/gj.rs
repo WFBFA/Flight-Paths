@@ -4,7 +4,7 @@ use geo::intersects::Intersects;
 
 use std::{collections::HashSet, convert::{TryFrom, TryInto}};
 use geojson::*;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, indexmap};
 
 pub type Nodes = IndexMap<NodeId, Node>;
 
@@ -33,4 +33,19 @@ pub fn geofeatures_to_snow(g: &RoadGraph, feat: FeatureCollection) -> data::Snow
 		}
 	}
 	snow
+}
+
+pub fn snows_to_geofeatures(g: &RoadGraph, snow: data::SnowStatuses) -> FeatureCollection {
+	let coords: IndexMap<_, _> = g.nodes.nodes.iter().map(|n| (&n.id, n.coordinates)).collect();
+	FeatureCollection {
+		features: snow.into_iter().map(|s| Feature {
+			geometry: Some(Geometry::new(Value::LineString(vec![s.p1, s.p2].into_iter().map(|p| coords.get(&p).unwrap()).map(|(lon, lat)| vec![*lon, *lat]).collect()))),
+			properties: Some(indexmap!{ "snow".to_string() => serde_json::to_value(s.depth).unwrap() }.into_iter().collect()),
+			bbox: None,
+			foreign_members: None,
+			id: None,
+		}).collect(),
+		bbox: None,
+		foreign_members: None,
+	}
 }

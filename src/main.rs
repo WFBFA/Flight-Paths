@@ -14,6 +14,7 @@ pub type NodeId = Cow<'static, str>;
 #[serde(untagged)]
 enum Wut {
 	Paths(data::Paths),
+	Snow(data::SnowStatuses),
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Debug)]
@@ -147,16 +148,19 @@ fn main() -> std::io::Result<()> {
 		log::info!("Constructed paths");
 		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
 	} else if let Some(matches) = matches.subcommand_matches("geojson") {
-		let roads: data::RoadGraphNodes = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
+		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
 		let pref = matches.value_of("prefix").unwrap();
 		let wut = serde_json::from_reader(&std::fs::File::open(matches.value_of("wut").unwrap())?).expect("WUT invalid JSON");
 		log::info!("Loaded configuration");
 		match wut {
 			Wut::Paths(paths) => {
-				let g = gj::roads_to_nodes(roads);
+				let g = gj::roads_to_nodes(roads.nodes);
 				for (i, path) in (0..paths.len()).zip(paths.into_iter()) {
 					serde_json::to_writer(&std::fs::File::create(format!("{}.{}.geojson", pref, i))?, &gj::path_to_geojson(&g, path)).unwrap();
 				}
+			}
+			Wut::Snow(snows) => {
+				serde_json::to_writer(&std::fs::File::create(format!("{}.geojson", pref))?, &gj::snows_to_geofeatures(&roads, snows)).unwrap();
 			}
 		}
 	}
