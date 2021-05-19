@@ -440,7 +440,7 @@ pub mod plow {
 				// log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
 			} else if let Some((v, y, u)) = {
-				log::trace!("attempting to reconnect...");
+				// log::trace!("attempting to reconnect...");
 				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
 				let us: Vec<_> = us.into_iter().map(|u| (u.clone(), g.nodes.get(u).unwrap().clone())).collect();
 				let vs = super::path_shmlop(sol, n);
@@ -449,7 +449,7 @@ pub mod plow {
 					.min_by_key(|((_, uc), (_, (vc, _)))| f64s::try_from(uc.distance(vc)).unwrap())
 					.map(|((u, _), (v, (_, y)))| (v, y, u))
 			} {
-				log::trace!("connecting {} to {}", v, u);
+				// log::trace!("connecting {} to {}", v, u);
 				if let Some(inj) = if let Some(mut p1) = super::pathfind::<DIRESPECT>(&g.edges, &v, &u, Some(&|e| !sol.contains(e))) {
 					if let Some(mut p2) = super::bicycle::<DIRESPECT>(&g.edges, &u, Some(&|e| !sol.contains(e) && !p1.contains(e))) {
 						if let Some(mut p3) = super::pathfind::<DIRESPECT>(&g.edges, &u, &v,Some(&|e| !sol.contains(e) && !p1.contains(e) && !p2.contains(e))) {
@@ -465,11 +465,11 @@ pub mod plow {
 				} else {
 					None
 				} {
-					log::trace!("infl8ting with {:?}", inj);
+					// log::trace!("infl8ting with {:?}", inj.len());
 					for e in &inj {
 						alloc.remove(e);
 					}
-					log::trace!("remaining: {:?}", alloc.len());
+					// log::trace!("remaining: {:?}", alloc.len());
 					g.sol[i].splice(y..y, inj);
 				} else {
 					log::warn!("Uh oh! Some of allocated sections aren't reachable!: {:?}", alloc);
