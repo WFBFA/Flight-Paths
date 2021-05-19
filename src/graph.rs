@@ -10,6 +10,9 @@ pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq {
 	fn p2(&self) -> NId;
 	fn directed(&self) -> bool;
 	fn weight(&self) -> Self::W;
+	fn is_cyclic(&self) -> bool {
+		self.p1() == self.p2()
+	}
 	fn other(&self, id: NId) -> NId {
 		if id == self.p1() {
 			self.p2()
