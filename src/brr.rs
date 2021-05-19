@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::HashMap, convert::{TryFrom, TryInto}, rc::Rc};
+use std::{cmp::max, collections::{HashMap, HashSet}, convert::{TryFrom, TryInto}, rc::Rc};
 
 use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
@@ -148,7 +148,7 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 
 /// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
-	log::trace!("cycling on {}", n0);
+	log::trace!("cycling on {} d {}", n0, combined_degree::<DIRESPECT>(n0, g.get(n0).unwrap()));
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
@@ -193,6 +193,40 @@ fn pathfind<const DIRESPECT: bool>(g: &Graph, n1: &NodeId, n2: &NodeId, pred: Op
 				if dp.get(v).map_or(true, |(vd, _)| vd > &d) {
 					dp.insert(v.clone(), (d, Some(e.clone())));
 					q.push(v.clone(), -d);
+				}
+			}
+		}
+	}
+	None
+}
+/// find shortest path between 2 regions
+fn pathfind_r<const DIRESPECT: bool>(g: &Graph, n1: &HashSet<&NodeId>, n2: &HashSet<&NodeId>, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<(NodeId, NodeId, Path)> {
+	log::trace!("pathing regions");
+	let mut dp: HashMap<&NodeId, (f64s, Option<Rc<Edge>>)> = HashMap::new();
+	let mut q = PriorityQueue::new();
+	for n1 in n1 {
+		dp.insert(n1, (f64s::ZERO, None));
+		q.push(*n1, f64s::ZERO);
+	}
+	while let Some((u, _)) = q.pop() {
+		if n2.contains(u) {
+			let mut path = Vec::new();
+			let mut v = u;
+			while let Some((_, Some(e))) = dp.get(v) {
+				v = e.other(v);
+				path.push(e.clone());
+			}
+			path.reverse();
+			return Some((v.clone(), u.clone(), path));
+		}
+		let d = dp.get(u).unwrap().0;
+		for e in g.get(u).unwrap() {
+			if (!DIRESPECT || !e.directed || &e.p1 == u) && pred.map_or(true, |f| f(e)) {
+				let v = e.other(&u);
+				let d = d + e.length;
+				if dp.get(v).map_or(true, |(vd, _)| vd > &d) {
+					dp.insert(v, (d, Some(e.clone())));
+					q.push(v, -d);
 				}
 			}
 		}
@@ -364,6 +398,7 @@ pub mod meta {
 pub mod plow {
 	use crate::*;
 	use data::Distance;
+	use indexmap::IndexMap;
 	use itertools::Itertools;
 	use rand::{Rng, prelude::SliceRandom};
 	use super::meta::*;
@@ -441,23 +476,19 @@ pub mod plow {
 				}
 				log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
-			} else if let Some((v, y, u)) = {
+			} else {
 				log::trace!("attempting to reconnect...");
 				let us: HashSet<_> = alloc.iter().flat_map(|e| if DIRESPECT || !e.directed { vec![&e.p1, &e.p2] } else { vec![&e.p1] }).collect();
-				let us: Vec<_> = us.into_iter().map(|u| (u.clone(), g.nodes.get(u).unwrap().clone())).collect();
 				let vs = super::path_shmlop(sol, n);
-				let vs: Vec<_> = (0..vs.len()).zip(vs.into_iter()).map(|(i, (v, _))| (v.clone(), (g.nodes.get(v).unwrap().clone(), i))).collect();
-				us.into_iter().cartesian_product(vs)
-					.min_by_key(|((_, uc), (_, (vc, _)))| f64s::try_from(uc.distance(vc)).unwrap())
-					.map(|((u, _), (v, (_, y)))| (v, y, u))
-			} {
-				let e = alloc.iter().find(|e| &e.p1 == &u || ((!DIRESPECT || !e.directed) && &e.p2 == &u)).unwrap();
-				log::trace!("connecting {} to {} to {} to {}", v, u, e.other(&u), v);
-				if let Some(inj) = if let Some(mut p1) = super::pathfind::<DIRESPECT>(&g.edges, &v, &u, Some(&|e| !sol.contains(e))) {
+				let vs: IndexMap<_, _> = vs.into_iter().enumerate().filter(|(_, (u, _))| g.edges.get(*u).unwrap().iter().filter(|e| !sol.contains(e)).count() >= 2 /*FIXME don't ignore direspect*/).map(|(i, (v, _))| (v, i)).collect();
+				let vs_s: HashSet<_> = vs.keys().map(|r| *r).collect();
+				if let Some((inj, y)) = if let Some((v, u, mut p1)) = super::pathfind_r::<DIRESPECT>(&g.edges, &vs_s, &us, Some(&|e| !sol.contains(e))) {
+					let e = alloc.iter().find(|e| &e.p1 == &u || ((!DIRESPECT || !e.directed) && &e.p2 == &u)).unwrap();
+					log::trace!("connecting {} to {} to {} to {}", v, u, e.other(&u), v);
 					p1.push(e.clone());
-					if let Some(mut p2) = super::pathfind::<DIRESPECT>(&g.edges, &u, &v,Some(&|e| !sol.contains(e) && !p1.contains(e))) {
+					if let Some(mut p2) = super::pathfind::<DIRESPECT>(&g.edges, e.other(&u), &v,Some(&|e| !sol.contains(e) && !p1.contains(e))) {
 						p1.append(&mut p2);
-						Some(p1)
+						Some((p1, *vs.get(&v).unwrap()))
 					} else {
 						None
 					}
@@ -471,11 +502,9 @@ pub mod plow {
 					log::trace!("remaining: {:?}", alloc.len());
 					g.sol[i].splice(y..y, inj);
 				} else {
-					log::warn!("Uh oh! Some of allocated sections aren't reachable!: {:?}", alloc);
+					panic!("Uh oh! Some of allocated sections aren't reachable!: {:?}", alloc);
 					break;
 				}
-			} else {
-				panic!("WTF?");
 			}
 		}
 	}
