@@ -431,16 +431,16 @@ pub mod plow {
 					}
 				})
 			} {
-				// log::trace!("{} @ {}", v, y);
+				log::trace!("{} @ {}", v, y);
 				let inj = super::bicycle::<DIRESPECT>(&g.edges, v, Some(&|e| !sol.contains(e))).unwrap();
-				// log::trace!("infl8ting with {:?}", inj.len());
+				log::trace!("infl8ting with {:?}", inj.len());
 				for e in &inj {
 					alloc.remove(e);
 				}
-				// log::trace!("remaining: {:?}", alloc.len());
+				log::trace!("remaining: {:?}", alloc.len());
 				g.sol[i].splice(y..y, inj);
 			} else if let Some((v, y, u)) = {
-				// log::trace!("attempting to reconnect...");
+				log::trace!("attempting to reconnect...");
 				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
 				let us: Vec<_> = us.into_iter().map(|u| (u.clone(), g.nodes.get(u).unwrap().clone())).collect();
 				let vs = super::path_shmlop(sol, n);
@@ -449,7 +449,7 @@ pub mod plow {
 					.min_by_key(|((_, uc), (_, (vc, _)))| f64s::try_from(uc.distance(vc)).unwrap())
 					.map(|((u, _), (v, (_, y)))| (v, y, u))
 			} {
-				// log::trace!("connecting {} to {}", v, u);
+				log::trace!("connecting {} to {}", v, u);
 				if let Some(inj) = if let Some(mut p1) = super::pathfind::<DIRESPECT>(&g.edges, &v, &u, Some(&|e| !sol.contains(e))) {
 					if let Some(mut p2) = super::bicycle::<DIRESPECT>(&g.edges, &u, Some(&|e| !sol.contains(e) && !p1.contains(e))) {
 						if let Some(mut p3) = super::pathfind::<DIRESPECT>(&g.edges, &u, &v,Some(&|e| !sol.contains(e) && !p1.contains(e) && !p2.contains(e))) {
@@ -465,11 +465,11 @@ pub mod plow {
 				} else {
 					None
 				} {
-					// log::trace!("infl8ting with {:?}", inj.len());
+					log::trace!("infl8ting with {:?}", inj.len());
 					for e in &inj {
 						alloc.remove(e);
 					}
-					// log::trace!("remaining: {:?}", alloc.len());
+					log::trace!("remaining: {:?}", alloc.len());
 					g.sol[i].splice(y..y, inj);
 				} else {
 					log::warn!("Uh oh! Some of allocated sections aren't reachable!: {:?}", alloc);
@@ -499,7 +499,7 @@ pub mod plow {
 	/// do the thing!
 	fn sno_plo<const DIRESPECT: bool>(g: &mut Graph, params: Parameters) -> Result<(), String> {
 		initial_allocation(g)?;
-		log::trace!("Initialized allocations");
+		log::debug!("Initialized allocations: {}", g.allocations.iter().map(|a| a.len()).join("/"));
 		let mut rng = rand::thread_rng();
 		let mut cost_best = f64s::INFINITY;
 		let mut value_best = f64s::INFINITY;
@@ -524,7 +524,7 @@ pub mod plow {
 			}
 		}
 		for _mi in 0..params.annealing.main_iterations {
-			log::trace!("iteration {} current best {:.1}", _mi, value_best.f());
+			log::debug!("iteration {} current best {:.1}", _mi, value_best.f());
 			let mut checck = checkpoint!();
 			//Try to improve allocations
 			//TODO? change alloc
@@ -538,14 +538,14 @@ pub mod plow {
 				},
 				Reorder::RandomReorder => order.shuffle(&mut rng),
 			}
-			log::trace!(" new order: {:?}", order);
+			log::debug!(" new order: {:?}", order);
 			//Provide new solutions
 			let mut cost_all = f64s::ZERO;
 			let mut cost_max = f64s::ZERO;
 			let mut costs = Vec::new();
 			costs.resize(vs, f64s::ZERO);
 			for i in &order {
-				log::trace!(" solving {}", i);
+				log::debug!(" solving {}", i);
 				solve_rpp::<DIRESPECT>(g, *i);
 				if params.clearing == Clearing::All {
 					sol_to_alloc(g); //TODO we can do better tho!
@@ -559,10 +559,10 @@ pub mod plow {
 			}
 			let (cost_all, cost_max) = (cost_all, cost_max); //freeze
 			let value = cost_all * params.weight_total + cost_max * params.weight_max;
-			log::trace!(" new value: {:.5}", value.f());
+			log::debug!(" new value: {:.5}", value.f());
 			//Accept solution for new allocations
 			if value < value_best || (value <= value_best && cost_max < cost_best) {
-				log::trace!(" solution accepted");
+				log::debug!(" solution accepted");
 				value_best = value;
 				cost_best = cost_max;
 				if params.clearing == Clearing::All {
@@ -574,7 +574,7 @@ pub mod plow {
 			match params.recycle {
 				Recycle::ExpensiveToCheap => {
 					let mut vycles: Vec<Vec<_>> = g.sol.iter().zip(g.vehicles.iter()).map(|(path, n0)| super::path_shmlop(path, n0).into_iter().map(|(v, _)| v.clone()).collect()).collect();
-					log::trace!(" costs: {:?}", costs);
+					log::debug!(" costs: {:?}", costs);
 					for i in 0..vs {
 						'nexc: for j in (i+1)..vs {
 							let (i, j) = if costs[order[i]] > costs[order[j]] { (order[i], order[j]) } else { (order[j], order[i]) };
@@ -585,7 +585,7 @@ pub mod plow {
 											if vycles[i][iv] == vycles[i][iu] {
 												// [i][iu..=iv] <=> [j][ju..=ju]
 												// same as
-												log::trace!("  [{}][{}..{}] => [{}][{}..{}]", i, iu, iv, j, ju, ju);
+												log::debug!("  [{}][{}..{}] => [{}][{}..{}]", i, iu, iv, j, ju, ju);
 												let mine: Vec<_> = g.sol[i].splice(iu..iv, vec![]).collect();
 												g.sol[j].splice(ju..ju, mine);
 												let mine: Vec<_> = vycles[i].splice(iu..iv, vec![]).collect();
@@ -610,20 +610,20 @@ pub mod plow {
 						}
 					}
 					let value_improv = cost_all_improv * params.weight_total + cost_max_improv * params.weight_max;
-					log::trace!(" improved value: {:.5}", value_improv.f());
+					log::debug!(" improved value: {:.5}", value_improv.f());
 					if value_improv < value {
-						log::trace!(" chances: {}", ((value_improv-value).f()/temperature).exp());
+						log::debug!(" chances: {}", ((value_improv-value).f()/temperature).exp());
 					}
 					//if the improved solution is actually better, or with some chance anyway, keep it
 					if value_improv < value_best || (value_improv <= value_best && cost_max_improv < cost_best) || (value_improv < value && rng.gen_range(0.0..1.0) < ((value_improv-value).f()/temperature).exp()) {
-						log::trace!(" improvements accepted");
+						log::debug!(" improvements accepted");
 						value_best = value_improv;
 						cost_best = cost_max_improv;
 						if params.clearing == Clearing::All {
 							sol_to_alloc(g);
 						}
 					} else {
-						log::trace!(" improvements rejected");
+						log::debug!(" improvements rejected");
 						revert!(checck);
 					}
 				}
@@ -634,7 +634,7 @@ pub mod plow {
 			if ii >= params.annealing.ft_iterations {
 				ii = 0;
 				temperature *= params.annealing.cooling_factor;
-				log::trace!(" t={:.2}", temperature);
+				log::debug!(" t={:.2}", temperature);
 			}
 		}
 		Ok(())
