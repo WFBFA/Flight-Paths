@@ -1,5 +1,6 @@
 use std::{collections::{HashMap, HashSet}, hash::Hash, rc::Rc};
 
+use indexmap::IndexSet;
 use priority_queue::PriorityQueue;
 
 pub trait Node<NId: Clone + Copy + Hash + Eq> : Clone {
@@ -121,5 +122,40 @@ where
 			}
 		}
 		None
+	}
+	/// Find a cycle over vertex
+	pub fn cycle_on<Weight, FW, const DIRESPECT: bool>(&self, n: NId, weight: FW) -> Option<Vec<Rc<E>>>
+	where
+		E: Eq,
+		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
+		FW: Fn(&Rc<E>) -> Option<Weight>,
+	{
+		self.cycle_on_rec::<_, _, DIRESPECT>(n, n, Weight::default(), &mut IndexSet::new(), &weight)
+	}
+	fn cycle_on_rec<Weight, FW, const DIRESPECT: bool>(&self, n: NId, u: NId, d: Weight, steck: &mut IndexSet<Rc<E>>, weight: &FW) -> Option<Vec<Rc<E>>>
+	where
+		E: Eq,
+		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
+		FW: Fn(&Rc<E>) -> Option<Weight>,
+	{
+		if u == n && d != Weight::default() {
+			Some(steck.drain(..).rev().collect())
+		} else {
+			for e in self.get_node_edges(u).unwrap() {
+				if !DIRESPECT || !e.directed() || e.p1() == u {
+					if steck.insert(e.clone()) {
+						if let Some(ed) = weight(e) {
+							let v = e.other(u);
+							let d = d + ed;
+							if let Some(path) = self.cycle_on_rec::<_, _, DIRESPECT>(n, v, d, steck, weight) {
+								return Some(path);
+							}
+						}
+						steck.pop();
+					}
+				}
+			}
+			None
+		}
 	}
 }
