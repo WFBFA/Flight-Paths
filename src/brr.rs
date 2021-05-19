@@ -1,6 +1,6 @@
 use std::{cmp::max, collections::HashMap, convert::{TryFrom, TryInto}, rc::Rc};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
 
 use crate::*;
@@ -148,31 +148,22 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 
 /// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
-	log::trace!("cycling on {}", n0);
-	bicycle_rec::<DIRESPECT>(g, n0, n0, &mut IndexSet::new(), pred)
-}
-fn bicycle_rec<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, u: &NodeId, steck: &mut IndexSet<Rc<Edge>>, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
-	log::trace!("{} {}", u, steck.len());
-	if u == n0 && steck.len() > 0 {
-		Some(steck.drain(..).rev().collect())
-	} else {
-		if steck.len() < 1500 {
-			for e in g.get(u).unwrap() {
-				if !DIRESPECT || !e.directed || &e.p1 == u {
-					if steck.insert(e.clone()) {
-						if pred.map_or(true, |p| p(e)) {
-							let v = e.other(u);
-							if let Some(path) = bicycle_rec::<DIRESPECT>(g, n0, v, steck, pred) {
-								return Some(path);
-							}
-						}
-						steck.pop();
-					}
-				}
+	// log::trace!("🚲");
+	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
+	q.push((n0.clone(), vec![]), f64s::ZERO);
+	while let Some(((n, path), d)) = q.pop() {
+		if &n == n0 && path.len() > 0 {
+			return Some(path);
+		}
+		for e in g.get(&n).unwrap() {
+			if !path.contains(e) && (!DIRESPECT || !e.directed || e.p1 == n) && pred.map_or(true, |f| f(e)) {
+				let mut path = path.clone();
+				path.push(e.clone());
+				q.push((e.other(&n).clone(), path),  d + e.length);
 			}
 		}
-		None
 	}
+	None
 }
 
 /// find shortest path between 2 points
