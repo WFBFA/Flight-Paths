@@ -510,10 +510,20 @@ pub mod plow {
 				g.sol[$i].iter().map(|e| e.length * if g.allocations[$i].contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap()}).sum()
 			}
 		}
+		macro_rules! checkpoint {
+			() => {
+				(g.sol.clone(), g.allocations.clone())
+			}
+		}
+		macro_rules! revert {
+			($checkpoint:expr) => {
+				g.sol = $checkpoint.0;
+				g.allocations = $checkpoint.1;
+			}
+		}
 		for _mi in 0..params.annealing.main_iterations {
 			log::trace!("iteration {} current best {:.1}", _mi, value_best.f());
-			let mut prev_sol = g.sol.iter().map(|_| Vec::new()).collect();
-			swap(&mut g.sol, &mut prev_sol);
+			let mut checck = checkpoint!();
 			//Try to improve allocations
 			//TODO? change alloc
 			match params.reorder {
@@ -556,7 +566,7 @@ pub mod plow {
 				if params.clearing == Clearing::All {
 					sol_to_alloc(g);
 				}
-				prev_sol = g.sol.clone();
+				checck = checkpoint!();
 			}
 			//Try to improve solution
 			match params.recycle {
@@ -612,7 +622,7 @@ pub mod plow {
 						}
 					} else {
 						log::trace!(" improvements rejected");
-						g.sol = prev_sol
+						revert!(checck);
 					}
 				}
 				Recycle::No => {}
