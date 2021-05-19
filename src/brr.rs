@@ -148,10 +148,11 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 
 /// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
-	// log::trace!("🚲");
+	log::trace!("cycling on {}", n0);
 	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
 	q.push((n0.clone(), vec![]), f64s::ZERO);
 	while let Some(((n, path), d)) = q.pop() {
+		// log::trace!("{} {}", n, path.len());
 		if &n == n0 && path.len() > 0 {
 			return Some(path);
 		}
@@ -442,7 +443,7 @@ pub mod plow {
 				g.sol[i].splice(y..y, inj);
 			} else if let Some((v, y, u)) = {
 				log::trace!("attempting to reconnect...");
-				let us: HashSet<_> = alloc.iter().flat_map(|e| vec![&e.p1, &e.p2]).collect();
+				let us: HashSet<_> = alloc.iter().flat_map(|e| if DIRESPECT || !e.directed { vec![&e.p1, &e.p2] } else { vec![&e.p1] }).collect();
 				let us: Vec<_> = us.into_iter().map(|u| (u.clone(), g.nodes.get(u).unwrap().clone())).collect();
 				let vs = super::path_shmlop(sol, n);
 				let vs: Vec<_> = (0..vs.len()).zip(vs.into_iter()).map(|(i, (v, _))| (v.clone(), (g.nodes.get(v).unwrap().clone(), i))).collect();
@@ -450,16 +451,13 @@ pub mod plow {
 					.min_by_key(|((_, uc), (_, (vc, _)))| f64s::try_from(uc.distance(vc)).unwrap())
 					.map(|((u, _), (v, (_, y)))| (v, y, u))
 			} {
-				log::trace!("connecting {} to {}", v, u);
+				let e = alloc.iter().find(|e| &e.p1 == &u || ((!DIRESPECT || !e.directed) && &e.p2 == &u)).unwrap();
+				log::trace!("connecting {} to {} to {} to {}", v, u, e.other(&u), v);
 				if let Some(inj) = if let Some(mut p1) = super::pathfind::<DIRESPECT>(&g.edges, &v, &u, Some(&|e| !sol.contains(e))) {
-					if let Some(mut p2) = super::bicycle::<DIRESPECT>(&g.edges, &u, Some(&|e| !sol.contains(e) && !p1.contains(e))) {
-						if let Some(mut p3) = super::pathfind::<DIRESPECT>(&g.edges, &u, &v,Some(&|e| !sol.contains(e) && !p1.contains(e) && !p2.contains(e))) {
-							p1.append(&mut p2);
-							p1.append(&mut p3);
-							Some(p1)
-						} else {
-							None
-						}
+					p1.push(e.clone());
+					if let Some(mut p2) = super::pathfind::<DIRESPECT>(&g.edges, &u, &v,Some(&|e| !sol.contains(e) && !p1.contains(e))) {
+						p1.append(&mut p2);
+						Some(p1)
 					} else {
 						None
 					}
