@@ -1,15 +1,15 @@
 use std::{collections::{HashMap, HashSet}, hash::Hash, rc::Rc};
 
+use priority_queue::PriorityQueue;
+
 pub trait Node<NId: Clone + Copy + Hash + Eq> : Clone {
 	fn id(&self) -> NId;
 }
 
 pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq {
-	type W: Clone + Copy + PartialEq + PartialOrd;
 	fn p1(&self) -> NId;
 	fn p2(&self) -> NId;
 	fn directed(&self) -> bool;
-	fn weight(&self) -> Self::W;
 	fn is_cyclic(&self) -> bool {
 		self.p1() == self.p2()
 	}
@@ -85,5 +85,41 @@ where
 	pub fn eulirian_compatible<const DIRESPECT: bool>(&self, n: NId) -> bool {
 		let d = self.degree::<DIRESPECT>(n);
 		d % 2 == 0 && (!DIRESPECT || d >= 0)
+	}
+	/// Find shortest path between 2 points
+	pub fn pathfind<Weight, const DIRESPECT: bool>(&self, n1: NId, n2: NId, weight: impl Fn(&Rc<E>) -> Option<Weight>) -> Option<Vec<Rc<E>>>
+	where
+		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>
+	{
+		let mut dp: HashMap<NId, (Weight, Option<Rc<E>>)> = HashMap::new();
+		dp.insert(n1.clone(), (Weight::default(), None));
+		let mut q = PriorityQueue::new();
+		q.push(n1.clone(), Weight::default());
+		while let Some((u, _)) = q.pop() {
+			if u == n2 {
+				let mut path = Vec::new();
+				let mut v = u;
+				while let Some((_, Some(e))) = dp.get(&v) {
+					v = e.other(v);
+					path.push(e.clone());
+				}
+				path.reverse();
+				return Some(path);
+			}
+			let d = dp.get(&u).unwrap().0;
+			for e in self.get_node_edges(u).unwrap() {
+				if !DIRESPECT || !e.directed() || e.p1() == u {
+					if let Some(ed) = weight(e){
+						let v = e.other(u);
+						let d = d + ed;
+						if dp.get(&v).map_or(true, |(vd, _)| vd > &d) {
+							dp.insert(v.clone(), (d, Some(e.clone())));
+							q.push(v.clone(), -d);
+						}
+					}
+				}
+			}
+		}
+		None
 	}
 }
