@@ -177,6 +177,7 @@ fn bicycle_rec<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, u: &NodeId, steck:
 
 /// find shortest path between 2 points
 fn pathfind<const DIRESPECT: bool>(g: &Graph, n1: &NodeId, n2: &NodeId, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
+	log::trace!("pathing {} to {}", n1, n2);
 	let mut dp: HashMap<NodeId, (f64s, Option<Rc<Edge>>)> = HashMap::new();
 	dp.insert(n1.clone(), (f64s::ZERO, None));
 	let mut q = PriorityQueue::new();
