@@ -33,6 +33,7 @@ where
 {
 	nodes: HashMap<NId, N>,
 	edges: IndexMap<NId, HashSet<E>>,
+	_empty: HashSet<E>,
 }
 
 impl<NId, N, E> Graph<NId, N, E>
@@ -41,13 +42,13 @@ where
 	E: Edge<NId>,
 {
 	pub fn new(nodes: HashMap<NId, N>, edges: IndexMap<NId, HashSet<E>>) -> Self {
-		Self { nodes, edges }
+		Self { nodes, edges, _empty: Default::default() }
 	}
 	pub fn get_node(&self, n: NId) -> Option<&N> {
 		self.nodes.get(&n)
 	}
-	pub fn get_edges(&self, n: NId) -> Option<&HashSet<E>> {
-		self.edges.get(&n)
+	pub fn get_edges(&self, n: NId) -> &HashSet<E> {
+		self.edges.get(&n).unwrap_or(&self._empty)
 	}
 	pub fn get_edges_between(&self, n1: NId, n2: NId) -> Vec<&E> {
 		self.edges.get(&n1).iter().flat_map(|es| es.iter()).filter(|e| e.other(n1) == n2).collect()
@@ -83,14 +84,11 @@ where
 	}
 	/// Calculate combined degree of a vertex
 	pub fn degree<const DIRESPECT: bool>(&self, n: NId) -> isize {
-		if let Some(es) = self.get_edges(n) {
-			if DIRESPECT {
-				-(es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed() && !e.is_cyclic()).count() as isize
-			} else {
-				es.iter().filter(|e| !e.is_cyclic()).count() as isize
-			}
+		let es = self.get_edges(n);
+		if DIRESPECT {
+			-(es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed() && !e.is_cyclic()).count() as isize
 		} else {
-			0
+			es.iter().filter(|e| !e.is_cyclic()).count() as isize
 		}
 	}
 	/// Check whether given node does not prevent a graph from being eulirian
@@ -120,7 +118,7 @@ where
 				return Some(path);
 			}
 			let d = dp.get(&u).unwrap().0;
-			for e in self.get_edges(u).unwrap() {
+			for e in self.get_edges(u) {
 				if !DIRESPECT || !e.directed() || e.p1() == u {
 					if let Some(ed) = weight(e){
 						let v = e.other(u);
@@ -162,7 +160,7 @@ where
 				return Some((v, u, path));
 			}
 			let d = dp.get(&u).unwrap().0;
-			for e in self.get_edges(u).unwrap() {
+			for e in self.get_edges(u) {
 				if !DIRESPECT || !e.directed() || e.p1() == u {
 					if let Some(ed) = weight(e){
 						let v = e.other(u);
@@ -190,7 +188,7 @@ where
 			if u == n && !path.is_empty() {
 				return Some(path);
 			}
-			for e in self.get_edges(u).unwrap() {
+			for e in self.get_edges(u) {
 				if !path.contains(&e) && (!DIRESPECT || !e.directed() || e.p1() == u) {
 					if let Some(ed) = weight(e) {
 						let mut path = path.clone();
@@ -276,7 +274,7 @@ pub mod heuristics {
 			}
 		}
 		while !alloc.is_empty() {
-			if let Some((v, y)) = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().find_map(|(i, (v, _))| if g.get_edges(v).unwrap().iter().any(|e| !sol.contains(&e) && alloc.contains(e)) { Some((v, i)) } else { None }) {
+			if let Some((v, y)) = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().find_map(|(i, (v, _))| if g.get_edges(v).iter().any(|e| !sol.contains(&e) && alloc.contains(e)) { Some((v, i)) } else { None }) {
 				log::trace!("injecting a cycle");
 				let inj = g.cycle_on::<_, _, DIRESPECT>(v, sol_weight!()).unwrap();
 				sol_inject!(inj, y);
@@ -284,7 +282,7 @@ pub mod heuristics {
 				log::trace!("connecting to a distant isle");
 				let vs: HashSet<_> = alloc.iter().flat_map(|e| if !DIRESPECT || !e.directed() { vec![e.p1(), e.p2()] } else { vec![e.p1()] }).collect();
 				let us: IndexMap<_, _> = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().filter_map(|(i, (u, _))| {
-					let ures: Vec<_> = g.get_edges(u).unwrap().iter().filter(|e| !sol.contains(e)).collect();
+					let ures: Vec<_> = g.get_edges(u).iter().filter(|e| !sol.contains(e)).collect();
 					if ures.iter().filter(|e| e.is_incoming::<DIRESPECT>(u)).count() > 0 && ures.iter().filter(|e| e.is_outgoing::<DIRESPECT>(u)).count() > 0 {
 						Some((u, i))
 					} else {
