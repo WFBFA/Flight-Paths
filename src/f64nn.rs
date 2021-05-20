@@ -1,6 +1,6 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt::{Display, Formatter}};
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, PartialOrd, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, PartialOrd, Default, Debug)]
 pub struct f64s(f64);
 impl Eq for f64s {}
 impl Ord for f64s {
@@ -76,5 +76,10 @@ impl std::ops::Neg for f64s {
 	type Output = Self;
 	fn neg(self) -> Self {
 		Self(-self.0)
+	}
+}
+impl Display for f64s {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
 	}
 }
