@@ -259,6 +259,60 @@ where
 	}
 }
 
+pub mod adapt {
+	use super::*;
+	pub trait IdentifiableNode {
+		type Id: Clone + Hash + Eq;
+		fn id(&self) -> &Self::Id;
+	}
+	pub struct GraphAdapter<NId, N, E, IdAcc, Gen>
+	where
+		NId: Clone + Copy + Hash + Eq,
+		E: Edge<NId>,
+		N: IdentifiableNode,
+		Gen: Fn(&N::Id, IdAcc) -> (NId, IdAcc),
+	{
+		pub graph: Graph<NId, N, E>,
+		fwd: HashMap<N::Id, NId>,
+		last_id: IdAcc,
+		next_id: Gen,
+	}
+	impl<NId, N, E, IdAcc, Gen> GraphAdapter<NId, N, E, IdAcc, Gen>
+	where
+		NId: Clone + Copy + Hash + Eq,
+		E: Edge<NId>,
+		N: IdentifiableNode,
+		IdAcc: Default,
+		Gen: Fn(&N::Id, IdAcc) -> (NId, IdAcc),
+	{
+		pub fn new(acc: IdAcc, gen: Gen) -> Self {
+			Self {
+				graph: Default::default(),
+				fwd: Default::default(),
+				last_id: acc,
+				next_id: gen,
+			}
+		}
+		pub fn id2nid(&self, n: &N::Id) -> Option<NId> {
+			self.fwd.get(n).map(|nid| *nid)
+		}
+		pub fn nid2id(&self, nid: NId) -> Option<&N::Id> {
+			self.graph.get_node(nid).map(|n| n.id())
+		}
+		pub fn add_node(mut self, n: N) -> Self {
+			let (nid, acc) = (self.next_id)(n.id(), self.last_id);
+			self.last_id = acc;
+			self.fwd.insert(n.id().clone(), nid);
+			self.graph.add_node(nid, n);
+			self
+		}
+		pub fn add_edge(&mut self, e: E) -> &mut Self {
+			self.graph.add_edge(e);
+			self
+		}
+	}
+}
+
 pub mod heuristics {
 	use super::*;
 	
