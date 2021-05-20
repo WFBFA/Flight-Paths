@@ -173,32 +173,22 @@ where
 		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
 		FW: Fn(&Rc<E>) -> Option<Weight>,
 	{
-		self.cycle_on_rec::<_, _, DIRESPECT>(n, n, Weight::default(), &mut IndexSet::new(), &weight)
-	}
-	fn cycle_on_rec<Weight, FW, const DIRESPECT: bool>(&self, n: NId, u: NId, d: Weight, steck: &mut IndexSet<Rc<E>>, weight: &FW) -> Option<Vec<Rc<E>>>
-	where
-		E: Eq,
-		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
-		FW: Fn(&Rc<E>) -> Option<Weight>,
-	{
-		if u == n && d != Weight::default() {
-			Some(steck.drain(..).rev().collect())
-		} else {
+		let mut q/* : PriorityQueue<(NId, IndexSet<Rc<E>>), Weight>*/ = PriorityQueue::new();
+		q.push((n, Vec::new()), Weight::default()); //FIXME can't use IndexSet coz it doesn't impl Hash :(
+		while let Some(((u, path), d)) = q.pop() {
+			if u == n && !path.is_empty() {
+				return Some(path);
+			}
 			for e in self.get_node_edges(u).unwrap() {
-				if !DIRESPECT || !e.directed() || e.p1() == u {
-					if steck.insert(e.clone()) {
-						if let Some(ed) = weight(e) {
-							let v = e.other(u);
-							let d = d + ed;
-							if let Some(path) = self.cycle_on_rec::<_, _, DIRESPECT>(n, v, d, steck, weight) {
-								return Some(path);
-							}
-						}
-						steck.pop();
+				if !path.contains(e) && (!DIRESPECT || !e.directed() || e.p1() == u) {
+					if let Some(ed) = weight(e) {
+						let mut path = path.clone();
+						path.push(e.clone());
+						q.push((u, path), d + ed); //FIXME i don't know why this works, but it does
 					}
 				}
 			}
-			None
 		}
+		None
 	}
 }
