@@ -1,4 +1,5 @@
 use crate::*;
+use graph::*;
 use graph::adapt::*;
 use data::Distance;
 use brr::meta::*;
@@ -70,7 +71,7 @@ where
 		}
 	}
 	/// iterative annealing solver
-	fn solve<'a, const DIRESPECT: bool>(&'a self, sps: &Vec<SID>, locs: &Vec<Coords>, snowy: &HashSet<&'a E>, params: Parameters) -> Vec<Vec<&'a E>> {
+	fn solve<'a, const DIRESPECT: bool>(&'a self, sps: &Vec<SID>, locs: &Vec<Coords>, snowy: &HashSet<&'a E>, params: &Parameters) -> Vec<Vec<&'a E>> {
 		let vs = locs.len();
 		let mut alloc = self.initial_allocation(locs, snowy.iter().map(|e| *e));
 		let mut solution: Vec<Vec<&'a E>> = (0..vs).map(|_| Vec::new()).collect();
@@ -213,5 +214,128 @@ where
 			}
 		}
 		solution
+	}
+}
+
+pub mod road {
+	use super::*;
+
+	#[derive(Clone, Debug)]
+	struct RoadNode {
+		id: NodeId,
+		coordinates: Coords,
+	}
+	impl IdentifiableNode for RoadNode {
+		type Id = NodeId;
+		fn id(&self) -> &Self::Id {
+			&self.id
+		}
+	}
+	impl Positioned for RoadNode {
+		fn pos(&self) -> Coords {
+			self.coordinates
+		}
+	}
+	impl From<data::Node> for RoadNode {
+		fn from(n: data::Node) -> Self {
+			Self {
+				id: n.id,
+				coordinates: n.coordinates,
+			}
+		}
+	}
+
+	#[derive(Clone, Eq, Debug)]
+	struct RoadEdge {
+		p1: SID,
+		p2: SID,
+		discriminator: Option<SID>,
+		directed: bool,
+		length: f64s,
+		iidx: u64,
+	}
+	impl PartialEq<RoadEdge> for RoadEdge {
+		fn eq(&self, other: &Self) -> bool {
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx == other.iidx
+		}
+	}
+	impl std::hash::Hash for RoadEdge {
+		fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
+			(self.p1, self.p2, self.discriminator, self.iidx).hash(h)
+		}
+	}
+	impl Weighted for RoadEdge {
+		fn weight(&self) -> f64s {
+			self.length
+		}
+	}
+	impl Edge<SID> for RoadEdge {
+		fn p1(&self) -> SID {
+			self.p1
+		}
+		fn p2(&self) -> SID {
+			self.p2
+		}
+		fn directed(&self) -> bool {
+			self.directed
+		}
+	}
+	impl RoadEdge {
+		fn duped(&self, other: &Self) -> bool {
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx != other.iidx
+		}
+		fn dupe(&self) -> Self {
+			Self {
+				p1: self.p1,
+				p2: self.p2,
+				discriminator: self.discriminator,
+				directed: self.directed,
+				length: self.length,
+				iidx: self.iidx + 1,
+			}
+		}
+	}
+
+	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: &Parameters) -> Result<data::Paths, String> {
+		let sns: Vec<NodeId> = vehicles.road.iter().flat_map(|l| roads.nodes.locate(l)).collect();
+		if sns.len() < vehicles.road.len() {
+			return Err("Failed to locate positions to the road graph".to_string());
+		}
+		log::info!("Located vehicles");
+		log::debug!("{:?}", sns);
+		let mut g: PlowSolver<RoadNode, RoadEdge, _> = plow_solver!();
+		for n in roads.nodes.nodes {
+			g.graph = g.graph.add_node(n.into());
+		}
+		for e in roads.roads {
+			g.graph.add_edge(RoadEdge {
+				p1: g.graph.id2nid(&e.p1).unwrap(),
+				p2: g.graph.id2nid(&e.p2).unwrap(),
+				discriminator: e.discriminator.map(|id| g.graph.id2nid(&id).unwrap()),
+				directed: e.directed,
+				length: e.distance,
+				iidx: 0
+			});
+		}
+		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
+		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
+		g.graph.graph.eulirianize::<_, _, _, _, false>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
+		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
+			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
+			g.graph.graph.edges().collect()
+		} else {
+			snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| {
+				let p1 = g.graph.id2nid(&s.p1).unwrap();
+				let p2 = g.graph.id2nid(&s.p2).unwrap();
+				let discr = s.discriminator.map(|d| g.graph.id2nid(&d).unwrap());
+				g.graph.graph.get_edges_between(p1, p2).into_iter().find(|e| e.discriminator == discr && e.iidx == 0).expect("Snow status edge not found")
+			}).collect()
+		};
+		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
+		let solution = g.solve::<false>(&sns, &locations, &snowy, params);
+		Ok(solution.into_iter().zip(sns.into_iter()).map(|(path, n)| Graph::<SID, RoadNode, RoadEdge>::path_to_nodes(path.into_iter(), n).into_iter().map(|(u, e)| data::PathSegment {
+			node: g.graph.nid2id(u).unwrap().clone(),
+			discriminator: e.and_then(|e| e.discriminator).map(|d| g.graph.nid2id(d).unwrap().clone()),
+		}).collect()).collect())
 	}
 }
