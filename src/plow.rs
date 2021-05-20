@@ -71,7 +71,11 @@ where
 		}
 	}
 	/// iterative annealing solver
-	fn solve<'a, const DIRESPECT: bool>(&'a self, sps: &Vec<SID>, locs: &Vec<Coords>, snowy: &HashSet<&'a E>, params: &Parameters) -> Vec<Vec<&'a E>> {
+	fn solve<'a, const DIRESPECT: bool>(&'a self, sps: &Vec<SID>, locs: &Vec<Coords>, snowy: &HashSet<&'a E>, params: &Parameters) -> Vec<Vec<&'a E>>
+	where
+		N::Id: std::fmt::Display,
+		E: std::fmt::Debug,
+	{
 		let vs = locs.len();
 		let mut alloc = self.initial_allocation(locs, snowy.iter().map(|e| *e));
 		let mut solution: Vec<Vec<&'a E>> = (0..vs).map(|_| Vec::new()).collect();
@@ -131,7 +135,7 @@ where
 						}
 						sol_next[i] = sol;
 					}
-					Err(_) => panic!("Can't reach everywhere :(") //TODO instead of panicking, try to reallocate unreachable sections first
+					Err(_es) => panic!("Can't reach everywhere :( {}", _es.into_iter().map(|e| format!("{:?} ({}<->{})", e, self.graph.nid2id(e.p1()).unwrap(), self.graph.nid2id(e.p2()).unwrap())).join(", ")) //TODO instead of panicking, try to reallocate unreachable sections first
 				}
 			}
 			//Evaluate
