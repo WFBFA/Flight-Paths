@@ -17,6 +17,12 @@ pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq + Eq {
 			self.p1()
 		}
 	}
+	fn is_incoming<const DIRESPECT: bool>(&self, id: NId) -> bool {
+		id == self.p2() || (id == self.p1() && (!DIRESPECT || !self.directed()))
+	}
+	fn is_outgoing<const DIRESPECT: bool>(&self, id: NId) -> bool {
+		id == self.p1() || (id == self.p2() && (!DIRESPECT || !self.directed()))
+	}
 }
 
 #[derive(Clone, Default, Debug)]
@@ -238,5 +244,74 @@ where
 			vs.push((e.other(vs.last().unwrap().0), Some(e)));
 		}
 		vs
+	}
+}
+
+pub mod heuristics {
+	use super::*;
+	
+	/// Solve Positioned Windy Rural Postman
+	pub fn solve_pwrp<'a, NId, N, E, Weight, FW, const DIRESPECT: bool>(g: &'a Graph<NId, N, E>, sp: NId, mut alloc: HashSet<&'a E>, weight: FW) -> Result<Vec<&'a E>, HashSet<&'a E>>
+	where 
+		NId: Clone + Copy + Hash + Eq,
+		E: Edge<NId>,
+		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
+		FW: Fn(&E) -> Option<Weight>,
+	{
+		log::trace!("Solving PWRP, starting with {}", alloc.len());
+		let mut sol: Vec<&E> = Vec::new();
+		macro_rules! sol_weight {
+			() => {
+				|e| if !sol.contains(&e) { weight(e) } else { None }
+			}
+		}
+		macro_rules! sol_inject {
+			($inj:expr,$y:expr) => {
+				log::trace!("of {}", $inj.len());
+				for e in &$inj {
+					alloc.remove(e);
+				}
+				log::trace!("remaining {}", alloc.len());
+				sol.splice($y..$y, $inj);
+			}
+		}
+		while !alloc.is_empty() {
+			if let Some((v, y)) = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().find_map(|(i, (v, _))| if g.get_edges(v).unwrap().iter().any(|e| !sol.contains(&e) && alloc.contains(e)) { Some((v, i)) } else { None }) {
+				log::trace!("injecting a cycle");
+				let inj = g.cycle_on::<_, _, DIRESPECT>(v, sol_weight!()).unwrap();
+				sol_inject!(inj, y);
+			} else {
+				log::trace!("connecting to a distant isle");
+				let vs: HashSet<_> = alloc.iter().flat_map(|e| if !DIRESPECT || !e.directed() { vec![e.p1(), e.p2()] } else { vec![e.p1()] }).collect();
+				let us: IndexMap<_, _> = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().filter_map(|(i, (u, _))| {
+					let ures: Vec<_> = g.get_edges(u).unwrap().iter().filter(|e| !sol.contains(e)).collect();
+					if ures.iter().filter(|e| e.is_incoming::<DIRESPECT>(u)).count() > 0 && ures.iter().filter(|e| e.is_outgoing::<DIRESPECT>(u)).count() > 0 {
+						Some((u, i))
+					} else {
+						None
+					}
+				}).collect();
+				if let Some((inj, y)) = if let Some((u, v, mut p)) = g.pathfind_regions::<_, _, DIRESPECT>(&us.keys().cloned().collect(), &vs, sol_weight!()) {
+					let e = alloc.iter().find(|e| e.is_outgoing::<DIRESPECT>(v)).unwrap();
+					p.push(*e);
+					if let Some(mut pb) = g.pathfind::<_, _, DIRESPECT>(e.other(v), u, |e| if !sol.contains(&e) && !p.contains(&e) { weight(e) } else { None }) {
+						p.append(&mut pb);
+						// log::trace!("connecting {} to {} to {} to {}", u, v, e.other(v), u);
+						Some((p, *us.get(&u).unwrap()))
+					} else {
+						None
+					}
+				} else {
+					None
+				} {
+					sol_inject!(inj, y);
+				} else {
+					log::trace!("failed to reach");
+					return Err(alloc);
+				}
+			}
+		}
+		log::trace!("solved visiting {} segments", sol.len());
+		Ok(sol)
 	}
 }
