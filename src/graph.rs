@@ -213,7 +213,7 @@ where
 					if let Some(ed) = weight(e) {
 						let mut path = path.clone();
 						path.push(e);
-						q.push((u, path), d + ed); //FIXME i don't know why this works, but it does
+						q.push((e.other(u), path), d + ed); //FIXME i don't know why this works, but it does
 					}
 				}
 			}
