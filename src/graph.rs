@@ -88,9 +88,10 @@ where
 		d % 2 == 0 && (!DIRESPECT || d >= 0)
 	}
 	/// Find shortest path between 2 points
-	pub fn pathfind<Weight, const DIRESPECT: bool>(&self, n1: NId, n2: NId, weight: impl Fn(&Rc<E>) -> Option<Weight>) -> Option<Vec<Rc<E>>>
+	pub fn pathfind<Weight, FW, const DIRESPECT: bool>(&self, n1: NId, n2: NId, weight: FW) -> Option<Vec<Rc<E>>>
 	where
-		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>
+		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
+		FW: Fn(&Rc<E>) -> Option<Weight>,
 	{
 		let mut dp: HashMap<NId, (Weight, Option<Rc<E>>)> = HashMap::new();
 		dp.insert(n1.clone(), (Weight::default(), None));
@@ -124,9 +125,10 @@ where
 		None
 	}
 	/// Find shortest path between 2 regions
-	pub fn pathfind_regions<Weight, const DIRESPECT: bool>(&self, n1: &HashSet<NId>, n2: &HashSet<NId>, weight: impl Fn(&Rc<E>) -> Option<Weight>) -> Option<(NId, NId, Vec<Rc<E>>)>
+	pub fn pathfind_regions<Weight, FW, const DIRESPECT: bool>(&self, n1: &HashSet<NId>, n2: &HashSet<NId>, weight: FW) -> Option<(NId, NId, Vec<Rc<E>>)>
 	where
-		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>
+		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
+		FW: Fn(&Rc<E>) -> Option<Weight>,
 	{
 		if n1.is_empty() || n2.is_empty() {
 			return None;
