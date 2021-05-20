@@ -74,9 +74,9 @@ where
 	pub fn degree<const DIRESPECT: bool>(&self, n: NId) -> isize {
 		if let Some(es) = self.get_node_edges(n) {
 			if DIRESPECT {
-				-(es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed()).count() as isize
+				-(es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed() && !e.is_cyclic()).count() as isize
 			} else {
-				es.len() as isize
+				es.iter().filter(|e| !e.is_cyclic()).count() as isize
 			}
 		} else {
 			0
