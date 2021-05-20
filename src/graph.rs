@@ -3,10 +3,6 @@ use std::{collections::{HashMap, HashSet}, hash::Hash};
 use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
 
-pub trait Node<NId: Clone + Copy + Hash + Eq> : Clone {
-	fn id(&self) -> NId;
-}
-
 pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq + Eq {
 	fn p1(&self) -> NId;
 	fn p2(&self) -> NId;
@@ -27,7 +23,6 @@ pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq + Eq {
 pub struct Graph<NId, N, E> 
 where 
 	NId: Clone + Copy + Hash + Eq,
-	N: Node<NId>,
 	E: Edge<NId>,
 {
 	nodes: HashMap<NId, N>,
@@ -37,7 +32,6 @@ where
 impl<NId, N, E> Graph<NId, N, E>
 where 
 	NId: Clone + Copy + Hash + Eq,
-	N: Node<NId>,
 	E: Edge<NId>,
 {
 	pub fn new(nodes: HashMap<NId, N>, edges: IndexMap<NId, HashSet<E>>) -> Self {
@@ -65,9 +59,9 @@ where
 		self.edges.values().all(HashSet::is_empty)
 	}
 	/// Adds (or replaces) a node
-	pub fn add_node(&mut self, n: N) -> Option<N> {
-		self.edges.entry(n.id()).or_default();
-		self.nodes.insert(n.id(), n)
+	pub fn add_node(&mut self, id: NId, n: N) -> Option<N> {
+		self.edges.entry(id).or_default();
+		self.nodes.insert(id, n)
 	}
 	/// Adds an edge
 	pub fn add_edge(&mut self, e: E) -> bool {
