@@ -67,6 +67,12 @@ where
 	pub fn get_edges_between(&self, n1: NId, n2: NId) -> Vec<&E> {
 		self.edges.get(&n1).iter().flat_map(|es| es.iter()).filter(|e| e.other(n1) == n2).collect()
 	}
+	pub fn nodes(&self) -> impl Iterator<Item=(NId,&N)> {
+		self.nodes.iter().map(|(id, n)| (*id, n))
+	}
+	pub fn edges(&self) -> impl Iterator<Item=&E> {
+		self.edges.iter().flat_map(|(n, es)| es.iter().filter(move |e| e.is_cyclic() || e.p1() == *n))
+	}
 	pub fn node_count(&self) -> usize {
 		self.nodes.len()
 	}
@@ -244,7 +250,8 @@ where
 			} else {
 				epre.collect()
 			};
-			es.sort_unstable_by_key(|e| priority(e));
+			//TODO Better sorting heurisitic when directionality is respected 
+			es.sort_unstable_by_key(|e| (-((self.get_edges(e.p1()).len()%2+self.get_edges(e.p2()).len()%2) as isize), priority(e).unwrap()));
 			self.add_edge(dupe(es[0]));
 		}
 		Ok(())
