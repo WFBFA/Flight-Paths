@@ -25,7 +25,7 @@ pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq + Eq {
 	}
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct Graph<NId, N, E> 
 where 
 	NId: Clone + Copy + Hash + Eq,
@@ -36,13 +36,27 @@ where
 	_empty: HashSet<E>,
 }
 
+impl<NId, N, E> Default for Graph<NId, N, E>
+where 
+	NId: Clone + Copy + Hash + Eq,
+	E: Edge<NId>,
+{
+	fn default() -> Self {
+		Self {
+			nodes: Default::default(),
+			edges: Default::default(),
+			_empty: Default::default(),
+		}
+	}
+}
+
 impl<NId, N, E> Graph<NId, N, E>
 where 
 	NId: Clone + Copy + Hash + Eq,
 	E: Edge<NId>,
 {
 	pub fn new(nodes: HashMap<NId, N>, edges: IndexMap<NId, HashSet<E>>) -> Self {
-		Self { nodes, edges, _empty: Default::default() }
+		Self { nodes, edges, ..Default::default() }
 	}
 	pub fn get_node(&self, n: NId) -> Option<&N> {
 		self.nodes.get(&n)
