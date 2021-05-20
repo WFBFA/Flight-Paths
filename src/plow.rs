@@ -296,7 +296,7 @@ pub mod road {
 		}
 	}
 
-	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: Parameters) -> Result<data::Paths, String> {
+	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: &Parameters) -> Result<data::Paths, String> {
 		let sns: Vec<NodeId> = vehicles.road.iter().flat_map(|l| roads.nodes.locate(l)).collect();
 		if sns.len() < vehicles.road.len() {
 			return Err("Failed to locate positions to the road graph".to_string());
@@ -332,7 +332,7 @@ pub mod road {
 			}).collect()
 		};
 		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
-		let solution = g.solve::<false>(&sns, &locations, &snowy, &params);
+		let solution = g.solve::<false>(&sns, &locations, &snowy, params);
 		Ok(solution.into_iter().zip(sns.into_iter()).map(|(path, n)| Graph::<SID, RoadNode, RoadEdge>::path_to_nodes(path.into_iter(), n).into_iter().map(|(u, e)| data::PathSegment {
 			node: g.graph.nid2id(u).unwrap().clone(),
 			discriminator: e.and_then(|e| e.discriminator).map(|d| g.graph.nid2id(d).unwrap().clone()),

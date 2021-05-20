@@ -146,7 +146,7 @@ fn main() -> std::io::Result<()> {
 		let vehicles: data::VehiclesConfiguration = serde_json::from_reader(&std::fs::File::open(matches.value_of("vehicles").unwrap())?).expect("Meta parameters invalid JSON");
 		let params: brr::meta::Parameters = serde_yaml::from_reader(&std::fs::File::open(matches.value_of("meta").unwrap())?).expect("Meta parameters invalid JSON");
 		log::info!("Loaded configuration");
-		let paths = plow::road::solve(roads, snow, matches.value_of("snow-d").map(|f| f.parse().unwrap()), vehicles, params).unwrap();
+		let paths = plow::road::solve(roads, snow, matches.value_of("snow-d").map(|f| f.parse().unwrap()), vehicles, &params).unwrap();
 		log::info!("Constructed paths");
 		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
 	} else if let Some(matches) = matches.subcommand_matches("geojson") {
