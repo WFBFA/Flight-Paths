@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, hash::Hash, rc::Rc};
+use std::{collections::{HashMap, HashSet}, hash::Hash};
 
 use indexmap::IndexSet;
 use priority_queue::PriorityQueue;
@@ -31,7 +31,7 @@ where
 	E: Edge<NId>,
 {
 	nodes: HashMap<NId, N>,
-	edges: HashMap<NId, HashSet<Rc<E>>>,
+	edges: HashMap<NId, HashSet<E>>,
 }
 
 impl<NId, N, E> Graph<NId, N, E>
@@ -40,7 +40,7 @@ where
 	N: Node<NId>,
 	E: Edge<NId>,
 {
-	pub fn new(nodes: HashMap<NId, N>, edges: HashMap<NId, HashSet<Rc<E>>>) -> Self {
+	pub fn new(nodes: HashMap<NId, N>, edges: HashMap<NId, HashSet<E>>) -> Self {
 		Self { nodes, edges }
 	}
 	pub fn empty() -> Self {
@@ -52,11 +52,11 @@ where
 	pub fn get_node(&self, id: NId) -> Option<&N> {
 		self.nodes.get(&id)
 	}
-	pub fn get_node_edges(&self, id: NId) -> Option<&HashSet<Rc<E>>> {
+	pub fn get_node_edges(&self, id: NId) -> Option<&HashSet<E>> {
 		self.edges.get(&id)
 	}
-	pub fn get_edges_between(&self, n1: NId, n2: NId) -> Vec<Rc<E>> {
-		self.edges.get(&n1).iter().flat_map(|es| es.iter()).filter(|e| e.other(n1) == n2).cloned().collect()
+	pub fn get_edges_between(&self, n1: NId, n2: NId) -> Vec<&E> {
+		self.edges.get(&n1).iter().flat_map(|es| es.iter()).filter(|e| e.other(n1) == n2).collect()
 	}
 	pub fn node_count(&self) -> usize {
 		self.nodes.len()
@@ -88,12 +88,12 @@ where
 		d % 2 == 0 && (!DIRESPECT || d >= 0)
 	}
 	/// Find shortest path between 2 points
-	pub fn pathfind<Weight, FW, const DIRESPECT: bool>(&self, n1: NId, n2: NId, weight: FW) -> Option<Vec<Rc<E>>>
+	pub fn pathfind<Weight, FW, const DIRESPECT: bool>(&self, n1: NId, n2: NId, weight: FW) -> Option<Vec<&E>>
 	where
 		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
-		FW: Fn(&Rc<E>) -> Option<Weight>,
+		FW: Fn(&E) -> Option<Weight>,
 	{
-		let mut dp: HashMap<NId, (Weight, Option<Rc<E>>)> = HashMap::new();
+		let mut dp: HashMap<NId, (Weight, Option<&E>)> = HashMap::new();
 		dp.insert(n1.clone(), (Weight::default(), None));
 		let mut q = PriorityQueue::new();
 		q.push(n1.clone(), Weight::default());
@@ -115,7 +115,7 @@ where
 						let v = e.other(u);
 						let d = d + ed;
 						if dp.get(&v).map_or(true, |(vd, _)| vd > &d) {
-							dp.insert(v.clone(), (d, Some(e.clone())));
+							dp.insert(v.clone(), (d, Some(e)));
 							q.push(v.clone(), -d);
 						}
 					}
@@ -125,15 +125,15 @@ where
 		None
 	}
 	/// Find shortest path between 2 regions
-	pub fn pathfind_regions<Weight, FW, const DIRESPECT: bool>(&self, n1: &HashSet<NId>, n2: &HashSet<NId>, weight: FW) -> Option<(NId, NId, Vec<Rc<E>>)>
+	pub fn pathfind_regions<Weight, FW, const DIRESPECT: bool>(&self, n1: &HashSet<NId>, n2: &HashSet<NId>, weight: FW) -> Option<(NId, NId, Vec<&E>)>
 	where
 		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
-		FW: Fn(&Rc<E>) -> Option<Weight>,
+		FW: Fn(&E) -> Option<Weight>,
 	{
 		if n1.is_empty() || n2.is_empty() {
 			return None;
 		}
-		let mut dp: HashMap<NId, (Weight, Option<Rc<E>>)> = HashMap::new();
+		let mut dp: HashMap<NId, (Weight, Option<&E>)> = HashMap::new();
 		let mut q = PriorityQueue::new();
 		for n1 in n1 {
 			dp.insert(n1.clone(), (Weight::default(), None));
@@ -157,7 +157,7 @@ where
 						let v = e.other(u);
 						let d = d + ed;
 						if dp.get(&v).map_or(true, |(vd, _)| vd > &d) {
-							dp.insert(v.clone(), (d, Some(e.clone())));
+							dp.insert(v.clone(), (d, Some(e)));
 							q.push(v.clone(), -d);
 						}
 					}
@@ -167,23 +167,23 @@ where
 		None
 	}
 	/// Find a cycle over vertex
-	pub fn cycle_on<Weight, FW, const DIRESPECT: bool>(&self, n: NId, weight: FW) -> Option<Vec<Rc<E>>>
+	pub fn cycle_on<Weight, FW, const DIRESPECT: bool>(&self, n: NId, weight: FW) -> Option<Vec<&E>>
 	where
 		E: Eq,
 		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
-		FW: Fn(&Rc<E>) -> Option<Weight>,
+		FW: Fn(&E) -> Option<Weight>,
 	{
-		let mut q/* : PriorityQueue<(NId, IndexSet<Rc<E>>), Weight>*/ = PriorityQueue::new();
+		let mut q/* : PriorityQueue<(NId, IndexSet<&E>), Weight>*/ = PriorityQueue::new();
 		q.push((n, Vec::new()), Weight::default()); //FIXME can't use IndexSet coz it doesn't impl Hash :(
 		while let Some(((u, path), d)) = q.pop() {
 			if u == n && !path.is_empty() {
 				return Some(path);
 			}
 			for e in self.get_node_edges(u).unwrap() {
-				if !path.contains(e) && (!DIRESPECT || !e.directed() || e.p1() == u) {
+				if !path.contains(&e) && (!DIRESPECT || !e.directed() || e.p1() == u) {
 					if let Some(ed) = weight(e) {
 						let mut path = path.clone();
-						path.push(e.clone());
+						path.push(e);
 						q.push((u, path), d + ed); //FIXME i don't know why this works, but it does
 					}
 				}
