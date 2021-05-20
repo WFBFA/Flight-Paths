@@ -77,7 +77,7 @@ where
 		self.nodes.len()
 	}
 	pub fn edge_count(&self) -> usize {
-		self.edges.values().map(HashSet::len).sum::<usize>()/2
+		self.edges().count()
 	}
 	pub fn is_empty(&self) -> bool {
 		self.nodes.is_empty()
