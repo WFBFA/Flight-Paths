@@ -33,6 +33,8 @@ where
 	E: graph::Edge<SID>,
 	Gen: Fn(&N::Id, SID) -> (SID, SID),
 {
+	/// allocates all snowy edges to some vehicle
+	/// uses positions of vehicles as gravicenters of allocation clusters
 	fn initial_allocation<'a>(&'a self, locs: Vec<Coords>, snowy: impl Iterator<Item = &'a E>) -> Vec<HashSet<&'a E>> {
 		let closest = |c: &(f64, f64)| (0..locs.len()).zip(locs.iter()).min_by_key(|(_, c2)| f64s::try_from(c.distance(*c2)).unwrap()).unwrap().0;
 		let mut allocations: Vec<_> = (0..locs.len()).map(|_| HashSet::new()).collect();
@@ -43,5 +45,21 @@ where
 			allocations[lv].insert(e);
 		}
 		allocations
+	}
+	/// updates allocation from solution
+	fn sol_to_alloc<'a>(&'a self, sols: &Vec<Vec<&'a E>>, allocs: &mut Vec<HashSet<&'a E>>, snowy: impl Fn(&E) -> bool){
+		for i in 0..sols.len() {
+			for e in &sols[i] {
+				if snowy(e) {
+					if allocs[i].insert(e) {
+						for a in 0..allocs.len() {
+							if a != i {
+								allocs[a].remove(e);
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 }
