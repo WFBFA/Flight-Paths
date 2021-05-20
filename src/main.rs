@@ -6,6 +6,7 @@ use f64nn::*;
 mod data;
 mod graph;
 mod brr;
+mod plow;
 mod gj;
 
 pub type NodeId = Cow<'static, str>;

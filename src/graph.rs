@@ -296,8 +296,11 @@ pub mod adapt {
 		pub fn id2nid(&self, n: &N::Id) -> Option<NId> {
 			self.fwd.get(n).map(|nid| *nid)
 		}
+		pub fn nid2node(&self, nid: NId) -> Option<&N> {
+			self.graph.get_node(nid)
+		} 
 		pub fn nid2id(&self, nid: NId) -> Option<&N::Id> {
-			self.graph.get_node(nid).map(|n| n.id())
+			self.nid2node(nid).map(|n| n.id())
 		}
 		pub fn add_node(mut self, n: N) -> Self {
 			let (nid, acc) = (self.next_id)(n.id(), self.last_id);
