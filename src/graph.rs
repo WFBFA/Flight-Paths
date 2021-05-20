@@ -1,13 +1,13 @@
 use std::{collections::{HashMap, HashSet}, hash::Hash};
 
-use indexmap::IndexSet;
+use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
 
 pub trait Node<NId: Clone + Copy + Hash + Eq> : Clone {
 	fn id(&self) -> NId;
 }
 
-pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq {
+pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq + Eq {
 	fn p1(&self) -> NId;
 	fn p2(&self) -> NId;
 	fn directed(&self) -> bool;
@@ -23,7 +23,7 @@ pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Graph<NId, N, E> 
 where 
 	NId: Clone + Copy + Hash + Eq,
@@ -31,7 +31,7 @@ where
 	E: Edge<NId>,
 {
 	nodes: HashMap<NId, N>,
-	edges: HashMap<NId, HashSet<E>>,
+	edges: IndexMap<NId, HashSet<E>>,
 }
 
 impl<NId, N, E> Graph<NId, N, E>
@@ -40,14 +40,8 @@ where
 	N: Node<NId>,
 	E: Edge<NId>,
 {
-	pub fn new(nodes: HashMap<NId, N>, edges: HashMap<NId, HashSet<E>>) -> Self {
+	pub fn new(nodes: HashMap<NId, N>, edges: IndexMap<NId, HashSet<E>>) -> Self {
 		Self { nodes, edges }
-	}
-	pub fn empty() -> Self {
-		Self {
-			nodes: HashMap::new(),
-			edges: HashMap::new(),
-		}
 	}
 	pub fn get_node(&self, n: NId) -> Option<&N> {
 		self.nodes.get(&n)
@@ -69,6 +63,23 @@ where
 	}
 	pub fn is_edge_empty(&self) -> bool {
 		self.edges.values().all(HashSet::is_empty)
+	}
+	/// Adds (or replaces) a node
+	pub fn add_node(&mut self, n: N) -> Option<N> {
+		self.edges.entry(n.id()).or_default();
+		self.nodes.insert(n.id(), n)
+	}
+	/// Adds an edge
+	pub fn add_edge(&mut self, e: E) -> bool {
+		if self.nodes.contains_key(&e.p1()) && self.nodes.contains_key(&e.p2()) {
+			if !e.is_cyclic() {
+				self.edges.entry(e.p1()).or_default().insert(e.clone());
+			}
+			self.edges.entry(e.p2()).or_default().insert(e);
+			true
+		} else {
+			false
+		}
 	}
 	/// Calculate combined degree of a vertex
 	pub fn degree<const DIRESPECT: bool>(&self, n: NId) -> isize {
@@ -190,5 +201,40 @@ where
 			}
 		}
 		None
+	}
+	/// Make the graph eulirian by duplicating edges.
+	///
+	/// The only possible reason for failure is when there is a directed edge going nowhere, in which case the offending edge is reurned.
+	pub fn eulirianize<P, FS, FP, FD, const DIRESPECT: bool>(&mut self, duped: FS, priority: FP, dupe: FD) -> Result<(), &E>
+	where
+		P: Ord,
+		FS: Fn(&E, &E) -> bool,
+		FP: Fn(&E) -> Option<P>,
+		FD: Fn(&E) -> E,
+	{
+		for i in 0..self.edges.len() {
+			let (u, es) = self.edges.get_index(i).unwrap();
+			if es.len() == 1 {
+				let e = es.iter().next().unwrap();
+				if DIRESPECT && e.directed() && e.p2() == *u {
+					return Err(self.edges.get_index(i).unwrap().1.iter().next().unwrap());
+				}
+				self.add_edge(dupe(e));
+			}
+		}
+		while let Some((u, es)) = self.edges.iter().find(|(u, _)| !self.eulirian_compatible::<DIRESPECT>(**u)) {
+			let u = *u;
+			let epre = es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some());
+			let mut es: Vec<_> = if DIRESPECT {
+				let ind = es.iter().filter(|e| e.directed() && e.p2() == u).count();
+				let outd = es.iter().filter(|e| e.directed() && e.p1() == u).count();
+				epre.filter(|e| !e.directed() || (outd > ind && e.p2() == u) || (ind > outd && e.p1() == u)).collect()
+			} else {
+				epre.collect()
+			};
+			es.sort_unstable_by_key(|e| priority(e));
+			self.add_edge(dupe(es[0]));
+		}
+		Ok(())
 	}
 }
