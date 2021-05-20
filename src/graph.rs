@@ -237,4 +237,12 @@ where
 		}
 		Ok(())
 	}
+	/// Converts a path consisting of successive edges to successively visited nodes
+	pub fn path_to_nodes<'a>( path: impl Iterator<Item = &'a E>, n: NId) -> Vec<(NId, Option<&'a E>)> { //TODO this can become a generator one day!
+		let mut vs = vec![(n, None)];
+		for e in path {
+			vs.push((e.other(vs.last().unwrap().0), Some(e)));
+		}
+		vs
+	}
 }
