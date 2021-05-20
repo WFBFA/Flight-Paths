@@ -49,11 +49,11 @@ where
 			edges: HashMap::new(),
 		}
 	}
-	pub fn get_node(&self, id: NId) -> Option<&N> {
-		self.nodes.get(&id)
+	pub fn get_node(&self, n: NId) -> Option<&N> {
+		self.nodes.get(&n)
 	}
-	pub fn get_node_edges(&self, id: NId) -> Option<&HashSet<E>> {
-		self.edges.get(&id)
+	pub fn get_edges(&self, n: NId) -> Option<&HashSet<E>> {
+		self.edges.get(&n)
 	}
 	pub fn get_edges_between(&self, n1: NId, n2: NId) -> Vec<&E> {
 		self.edges.get(&n1).iter().flat_map(|es| es.iter()).filter(|e| e.other(n1) == n2).collect()
@@ -72,7 +72,7 @@ where
 	}
 	/// Calculate combined degree of a vertex
 	pub fn degree<const DIRESPECT: bool>(&self, n: NId) -> isize {
-		if let Some(es) = self.get_node_edges(n) {
+		if let Some(es) = self.get_edges(n) {
 			if DIRESPECT {
 				-(es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed() && !e.is_cyclic()).count() as isize
 			} else {
@@ -109,7 +109,7 @@ where
 				return Some(path);
 			}
 			let d = dp.get(&u).unwrap().0;
-			for e in self.get_node_edges(u).unwrap() {
+			for e in self.get_edges(u).unwrap() {
 				if !DIRESPECT || !e.directed() || e.p1() == u {
 					if let Some(ed) = weight(e){
 						let v = e.other(u);
@@ -151,7 +151,7 @@ where
 				return Some((v, u, path));
 			}
 			let d = dp.get(&u).unwrap().0;
-			for e in self.get_node_edges(u).unwrap() {
+			for e in self.get_edges(u).unwrap() {
 				if !DIRESPECT || !e.directed() || e.p1() == u {
 					if let Some(ed) = weight(e){
 						let v = e.other(u);
@@ -173,13 +173,13 @@ where
 		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
 		FW: Fn(&E) -> Option<Weight>,
 	{
-		let mut q/* : PriorityQueue<(NId, IndexSet<&E>), Weight>*/ = PriorityQueue::new();
+		let mut q = PriorityQueue::new();
 		q.push((n, Vec::new()), Weight::default()); //FIXME can't use IndexSet coz it doesn't impl Hash :(
 		while let Some(((u, path), d)) = q.pop() {
 			if u == n && !path.is_empty() {
 				return Some(path);
 			}
-			for e in self.get_node_edges(u).unwrap() {
+			for e in self.get_edges(u).unwrap() {
 				if !path.contains(&e) && (!DIRESPECT || !e.directed() || e.p1() == u) {
 					if let Some(ed) = weight(e) {
 						let mut path = path.clone();
