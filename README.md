@@ -24,6 +24,20 @@ The lengths of paths of vehicles are balanced, to _some_ possible/reasonable ext
 
 The `fly` command allows to compute drone paths for vehicles starting in specified locations.
 
+#### Example usage
+1. get ur road graph in `montreal.roads.json`
+2. create a drone configuration in `drones.json`. for example
+```json
+[
+	"596644787",
+	"218198673",
+	"4234468198"
+]
+```
+3. run `cargo bin -- fly montreal.roads.json drones.json drones.paths.json`
+4. the paths for the 3 drones are now in `drones.paths.json`
+5. shalt thou wish to geojsonify it, run `cargo bin -- geojson montreal.roads.json drones.paths.json drones.path` and make use of the generated `drones.path.1.geojson`, `drones.path.2.geojson` and `drones.path.3.geojson` files.
+
 ## Snow Status Aggregation
 
 The `snow` command allows aggregating multiple snow status informations into a single one. Additionally, multiple formats are supported:
@@ -61,17 +75,3 @@ Currently supported conversions:
 - Snow
 - Vehicles
 - Paths
-
-## Example usage
-1. get ur road graph in `montreal.roads.json`
-2. create a drone configuration in `drones.json`. for example
-```json
-[
-	"596644787",
-	"218198673",
-	"4234468198"
-]
-```
-3. run `cargo bin -- fly montreal.roads.json drones.json drones.paths.json`
-4. the paths for the 3 drones are now in `drones.paths.json`
-5. shalt thou wish to geojsonify it, run `cargo bin -- geojson montreal.roads.json drones.paths.json drones.path` and make use of the generated `drones.path.1.geojson`, `drones.path.2.geojson` and `drones.path.3.geojson` files.
