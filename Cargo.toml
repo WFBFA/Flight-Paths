@@ -1,7 +1,10 @@
 [package]
-name = "flight_paths"
+name = "wfbfa-solver-cli"
 version = "0.1.0"
 edition = "2018"
+description = "Universal CLI for solving flight & plow problems, as well as converting spec'd data to/from GeoJSON"
+repository = "https://github.com/WFBFA/Paths"
+license = "MIT"
 
 [dependencies]
 serde = { version = "^1.0", features = ["derive"] }
