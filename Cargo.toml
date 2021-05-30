@@ -15,5 +15,6 @@ noisy_float = { version = "0.2.0", features = ["serde"] }
 geojson = { version = "^0.22", features = ["geo-types"] }
 geo = "^0.18"
 clap = "^2.33"
+try_all = "0.0.2"
 log = "^0.4"
 env_logger = "^0.8"

@@ -237,10 +237,7 @@ fn bl33p<const DIRESPECT: bool>(mut g: Graph, sns: &Vec<NodeId>) -> Vec<Path> {
 }
 
 pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> Result<data::Paths, String> {
-	let sns: Vec<NodeId> = drones.iter().flat_map(|l| roads.nodes.locate(l)).collect();
-	if sns.len() < drones.len() {
-		return Err("Failed to locate positions to the road graph".to_string());
-	}
+	let sns: Vec<NodeId> = drones.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to located {:?}", l)))?.collect();
 	log::info!("Located drones");
 	let mut g = kreek::<false>(roads.try_into()?)?;
 	log::info!("Kreeked road graph");

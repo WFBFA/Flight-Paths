@@ -301,10 +301,7 @@ pub mod road {
 	}
 
 	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: &Parameters) -> Result<data::Paths, String> {
-		let sns: Vec<NodeId> = vehicles.road.iter().flat_map(|l| roads.nodes.locate(l)).collect();
-		if sns.len() < vehicles.road.len() {
-			return Err("Failed to locate positions to the road graph".to_string());
-		}
+		let sns: Vec<NodeId> = vehicles.road.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to located {:?}", l)))?.collect();
 		log::info!("Located vehicles");
 		log::debug!("{:?}", sns);
 		let mut g: PlowSolver<RoadNode, RoadEdge, _> = plow_solver!();
@@ -328,12 +325,12 @@ pub mod road {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
 			g.graph.graph.edges().collect()
 		} else {
-			snow.into_iter().filter(|s| s.depth > 0.0).map(|s| {
-				let p1 = g.graph.id2nid(&s.p1).unwrap();
-				let p2 = g.graph.id2nid(&s.p2).unwrap();
+			snow.into_iter().filter(|s| s.depth > 0.0).try_map_all(|s| {
+				let p1 = g.graph.id2nid(&s.p1).ok_or_else(|| format!("Snow status node {} not found", s.p1))?;
+				let p2 = g.graph.id2nid(&s.p2).ok_or_else(|| format!("Snow status node {} not found", s.p2))?;
 				let discr = s.discriminator.map(|d| g.graph.id2nid(&d).unwrap());
-				g.graph.graph.get_edges_between(p1, p2).into_iter().find(|e| e.discriminator == discr && e.iidx == 0).expect("Snow status edge not found")
-			}).collect()
+				g.graph.graph.get_edges_between(p1, p2).into_iter().find(|e| e.discriminator == discr && e.iidx == 0).ok_or_else(|| format!("Snow status edge not found"))
+			})?.collect()
 		};
 		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
 		let solution = g.solve::<false>(&sns, &locations, &snowy, params);

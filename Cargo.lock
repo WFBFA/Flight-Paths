@@ -131,6 +131,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "try_all",
 ]
 
 [[package]]
@@ -567,6 +568,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "try_all"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f6ecfaebdf2f044e5366c3447100514def1ed119892034e374b61fa45876bac"
 
 [[package]]
 name = "typenum"
