@@ -319,6 +319,79 @@ where
 		}
 		None
 	}
+	/// Detect all strongly connected components in the graph
+	///
+	/// Currently uses unrecursed Tarjan's SCC algorithm.
+	///
+	/// Arguments:
+	/// - `DIRESPECT`: whether the directionality of edges is respected
+	pub fn strongly_connected_components<const DIRESPECT: bool>(&self) -> Vec<HashSet<NId>>
+	where NId: std::fmt::Display {
+		use std::cmp::min;
+		let mut sccs = Vec::new();
+		let mut index = 0usize;
+		let mut stack = Vec::new();
+		let mut inf: HashMap<_, (bool, usize, usize)> = HashMap::new();
+		let mut q = Vec::new();
+		for u in self.nodes.keys().into_iter().cloned() {
+			if !inf.contains_key(&u) {
+				q.push((u, self.get_edges(u).iter().collect::<Vec<_>>(), false));
+				// "strongconnect"
+				'unrec: while let Some((u, es, jr)) = q.last_mut() {
+					let u = *u;
+					// first visit
+					if !inf.contains_key(&u) {
+						stack.push(u);
+						inf.insert(u, (true, index, index));
+						index = index + 1;
+					}
+					// look at successors
+					while let Some(e) = es.last() {
+						if e.is_outgoing::<DIRESPECT>(u) {
+							let v = e.other(u);
+							let iv = inf.get(&v).cloned();
+							let (.., ull) = inf.get_mut(&u).unwrap();
+							match iv {
+								// v has not yet been visited
+								None => {
+									*jr = true;
+									q.push((v, self.get_edges(v).iter().collect::<Vec<_>>(), false));
+									continue 'unrec;
+								},
+								// v was just visited
+								Some((.., vll)) if *jr => {
+									*ull = min(*ull, vll);
+									*jr = false;
+								},
+								// v is in current scc
+								Some((true, vidx, ..)) => {
+									*ull = min(*ull, vidx)
+								},
+								_ => {}
+							}
+						}
+						es.pop();
+					}
+					// generate scc
+					let (_, idx, ll) = inf.get(&u).cloned().unwrap();
+					if idx == ll {
+						let mut scc = HashSet::new();
+						loop {
+							let v = stack.pop().unwrap();
+							inf.get_mut(&v).unwrap().0 = false;
+							scc.insert(v);
+							if v == u {
+								break;
+							}
+						}
+						sccs.push(scc);
+					}
+					q.pop();
+				}
+			}
+		}
+		sccs
+	}
 	/// Fixes all sad edges
 	///
 	/// A sad edge is an edge(s) that outright prevents Eulirinization of the graph, even after SCC patch.
@@ -602,5 +675,75 @@ pub mod heuristics {
 		}
 		log::trace!("solved visiting {} segments", sol.len());
 		Ok(sol)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	impl Edge<u64> for (u64, u64) {
+		fn p1(&self) -> u64 {
+			self.0
+		}
+		fn p2(&self) -> u64 {
+			self.1
+		}
+		fn directed(&self) -> bool {
+			true
+		}
+	}
+	impl<W: Hash + Eq + Clone> Edge<u64> for (u64, u64, W) {
+		fn p1(&self) -> u64 {
+			self.0
+		}
+		fn p2(&self) -> u64 {
+			self.1
+		}
+		fn directed(&self) -> bool {
+			true
+		}
+	}
+
+	macro_rules! graph {
+		($edges:expr) => {
+			{
+				let mut g: Graph<_, _, _> = Default::default();
+				for e in $edges {
+					g.add_node(e.p1(), ());
+					g.add_node(e.p2(), ());
+					g.add_edge(e);
+				}
+				g
+			}
+		};
+	}
+
+	macro_rules! assert_eq_unordered {
+		($left:expr, $right:expr) => {
+			match (&$left, &$right) {
+				(left, right) => {
+					if left.len() != right.len() {
+						assert_eq!(left, right);
+					} else {
+						for i in left {
+							if !right.contains(i) {
+								assert_eq!(left, right);
+							}
+						}
+					}
+				}
+			}
+		};
+	}
+
+	#[test]
+	fn test_sccs(){
+		let g = graph!(vec![(0, 1)]);
+		assert_eq_unordered!(g.strongly_connected_components::<true>(), vec![vec![0].into_iter().collect(), vec![1].into_iter().collect()]);
+		assert_eq_unordered!(g.strongly_connected_components::<false>(), vec![vec![0, 1].into_iter().collect()]);
+		let g = graph!(vec![(0, 1), (1, 2), (2, 0), (3, 1), (3, 2), (4, 5), (5, 4)]);
+		assert_eq_unordered!(g.strongly_connected_components::<true>(), vec![vec![0, 1, 2].into_iter().collect(), vec![3].into_iter().collect(), vec![4, 5].into_iter().collect()]);
+		assert_eq_unordered!(g.strongly_connected_components::<false>(), vec![vec![0, 1, 2, 3].into_iter().collect(), vec![4, 5].into_iter().collect()]);
 	}
 }
