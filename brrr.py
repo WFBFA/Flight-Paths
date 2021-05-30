@@ -1,6 +1,14 @@
 import heapq;
 import math;
 
+#################################################################
+# This is the initial proof-of-concept for drone routing.
+# 
+# Unsurprisingly, 🐍 is not fast enough for computing solutions
+# for Montreal in reasonable time, so the implementation
+# migrated to 🦀.
+#################################################################
+
 # edge: (n1, n2, discriminator, length, iidx)
 
 def kreek(nodes, edges):

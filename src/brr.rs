@@ -1,3 +1,13 @@
+//! **Drones go brrr!**
+//!
+//! Drone pathing solver.
+//!
+//! The drones problem is the simplified version of the plowing problem - _all_ edges need to be visited, and directionality need not be respected.
+//! ...so it was implemented first 🤷‍♂️, with initial PoC in 🐍.
+//!
+//! Now that there is a proper, generic, PWRP solver, drone pathing has no reason for staying usin' the legacy code...
+//! _other than the lack of time for migration._
+
 use std::{cmp::max, collections::{HashMap, HashSet}, convert::{TryFrom, TryInto}, rc::Rc};
 
 use indexmap::IndexMap;
