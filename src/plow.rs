@@ -1,3 +1,5 @@
+//! ❄ plow problem annealing solver
+
 use crate::*;
 use graph::*;
 use graph::adapt::*;
@@ -19,6 +21,9 @@ trait Weighted {
 	fn weight(&self) -> N64;
 }
 
+/// Solver with a graph attached.
+///
+/// For ~~no~~ a number of reasons, graph node id is forced to `u64`.
 struct PlowSolver<N, E, Gen>
 where
 	N: IdentifiableNode + Positioned,
@@ -27,6 +32,7 @@ where
 {
 	graph: GraphAdapter<SID, N, E, SID, Gen>,
 }
+/// Construct new generic plow solver, with incremental node ids generation
 macro_rules! plow_solver {
 	() => {
 		PlowSolver {
@@ -41,8 +47,9 @@ where
 	E: graph::Edge<SID> + Weighted,
 	Gen: Fn(&N::Id, SID) -> (SID, SID),
 {
-	/// allocates all snowy edges to some vehicle
-	/// uses positions of vehicles as gravicenters of allocation clusters
+	/// Allocates all snowy edges to some vehicle.
+	///
+	/// Uses positions of vehicles as gravicenters of allocation clusters.
 	fn initial_allocation<'a>(&'a self, locs: &Vec<Coords>, snowy: impl Iterator<Item = &'a E>) -> Vec<HashSet<&'a E>> {
 		let closest = |c: &(f64, f64)| (0..locs.len()).zip(locs.iter()).min_by_key(|(_, c2)| n64(c.distance(*c2))).unwrap().0;
 		let mut allocations: Vec<_> = (0..locs.len()).map(|_| HashSet::new()).collect();
@@ -70,7 +77,18 @@ where
 			}
 		}
 	}
-	/// iterative annealing solver
+	/// Iterative annealing solver.
+	///
+	/// The graph _must_ be eulirian (you can use [`Graph::eulirianize`] to make sure), or expect _whippity whoppity panics are my property_.
+	///
+	/// Arguments:
+	/// - `DIRESPECT`
+	/// - `sps`: starting locations, on the graph, of each vehicle
+	/// - `locs`: starting locations, geographically, of each vehicle
+	/// - `snowy`: set of edges that need to be cleared
+	/// - `params`: meta parameters
+	///
+	/// Returns: paths, for each vehicle
 	fn solve<'a, const DIRESPECT: bool>(&'a self, sps: &Vec<SID>, locs: &Vec<Coords>, snowy: &HashSet<&'a E>, params: &Parameters) -> Vec<Vec<&'a E>>
 	where
 		N::Id: std::fmt::Display,
@@ -221,6 +239,7 @@ where
 	}
 }
 
+/// Specialization for solving road plowing paths
 pub mod road {
 	use super::*;
 
@@ -300,6 +319,9 @@ pub mod road {
 		}
 	}
 
+	/// Solves the snow plowing problem for roads.
+	///
+	/// Except it also converts all the data both ways and does other safety checks.
 	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: &Parameters) -> Result<data::Paths, String> {
 		let sns: Vec<NodeId> = vehicles.road.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to located {:?}", l)))?.collect();
 		log::info!("Located vehicles");

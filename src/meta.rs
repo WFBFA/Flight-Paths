@@ -1,3 +1,5 @@
+//! Meta parameters for the ❄ plow problem annealing solver
+
 use crate::*;
 use serde::*;
 
