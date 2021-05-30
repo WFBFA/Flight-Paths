@@ -141,6 +141,18 @@ where
 			false
 		}
 	}
+	/// Removes an edge
+	pub fn remove_edge(&mut self, e: &E) -> bool {
+		if self.nodes.contains_key(&e.p1()) && self.nodes.contains_key(&e.p2()) {
+			if !e.is_cyclic() {
+				self.edges.entry(e.p1()).or_default().remove(e);
+			}
+			self.edges.entry(e.p2()).or_default().remove(e);
+			true
+		} else {
+			false
+		}
+	}
 	/// Calculate combined degree of a vertex
 	///
 	/// - For an undirected graph, combined degree is "simply" degree - aka number of edges at the vertex.
@@ -306,6 +318,38 @@ where
 			}
 		}
 		None
+	}
+	/// Fixes all sad edges
+	///
+	/// A sad edge is an edge(s) that outright prevents Eulirinization of the graph.
+	///
+	/// Type Parameters:
+	/// - `DIRESPECT`: whether the directionality of edges is respected (sad edges can only exist in mixed graphs, calling this without respect is no-op)
+	///
+	/// Arguments:
+	/// - `dedirect`: function that transforms a directed edge into an undirected one, preserving all other properties (the function is always and only fed directed edges)
+	pub fn fix_sadness<FD, const DIRESPECT: bool>(&mut self, dedirect: FD)
+	where
+		FD: Fn(E) -> E,
+	{
+		if DIRESPECT {
+			let mut redir = HashSet::new();
+			for (u, es) in &self.edges {
+				let u = *u;
+				if es.len() > 0 && es.iter().all(|e| e.directed()) {
+					let e = es.iter().next().unwrap();
+					if es.iter().all(|ee| ee.is_incoming::<DIRESPECT>(u) == e.is_incoming::<DIRESPECT>(u) && ee.is_outgoing::<DIRESPECT>(u) == e.is_outgoing::<DIRESPECT>(u)) {
+						redir.insert(e.clone());
+					}
+				}
+			}
+			for e in &redir {
+				self.remove_edge(e);
+			}
+			for e in redir.into_iter().map(dedirect) {
+				self.add_edge(e);
+			}
+		}
 	}
 	/// Make the graph eulirian by duplicating edges.
 	///
