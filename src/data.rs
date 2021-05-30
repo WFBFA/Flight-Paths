@@ -60,7 +60,7 @@ pub struct RoadGraphNodes {
 impl RoadGraphNodes {
 	pub fn locate(&self, l: &Location) -> Option<NodeId> {
 		match l {
-			Location::Coordinates(lon, lat) => self.nodes.iter().min_by_key(|Node {coordinates, ..}| N64::try_from((*lon, *lat).distance(coordinates)).unwrap()).map(|n| n.id.clone()),
+			Location::Coordinates(lon, lat) => self.nodes.iter().min_by_key(|Node {coordinates, ..}| n64((*lon, *lat).distance(coordinates))).map(|n| n.id.clone()),
 			Location::Node(n) => Some(n.clone()),
 		}
 	}

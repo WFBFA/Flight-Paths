@@ -41,7 +41,7 @@ pub fn geofeatures_to_snow(g: &RoadGraph, feat: FeatureCollection) -> data::Snow
 					p1: e.p1.clone(),
 					p2: e.p2.clone(),
 					discriminator: e.discriminator.clone(),
-					depth: N64::try_from(depth).unwrap(),
+					depth: n64(depth),
 				});
 			}
 		}

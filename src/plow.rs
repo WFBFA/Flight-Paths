@@ -44,7 +44,7 @@ where
 	/// allocates all snowy edges to some vehicle
 	/// uses positions of vehicles as gravicenters of allocation clusters
 	fn initial_allocation<'a>(&'a self, locs: &Vec<Coords>, snowy: impl Iterator<Item = &'a E>) -> Vec<HashSet<&'a E>> {
-		let closest = |c: &(f64, f64)| (0..locs.len()).zip(locs.iter()).min_by_key(|(_, c2)| N64::try_from(c.distance(*c2)).unwrap()).unwrap().0;
+		let closest = |c: &(f64, f64)| (0..locs.len()).zip(locs.iter()).min_by_key(|(_, c2)| n64(c.distance(*c2))).unwrap().0;
 		let mut allocations: Vec<_> = (0..locs.len()).map(|_| HashSet::new()).collect();
 		for e in snowy {
 			let lv1 = closest(&self.graph.nid2node(e.p1()).unwrap().pos());
@@ -88,10 +88,10 @@ where
 		let mut order: Vec<_> = (0..vs).collect();
 		macro_rules! cycle_cost_compute {
 			($sol:expr,$alloc:expr,$dun:expr) => {
-				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && if params.clearing == Clearing::All { !$dun.contains(e) } else { $alloc.contains(e) } { params.slowdown } else { N64::try_from(1.0).unwrap() }).sum()
+				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && if params.clearing == Clearing::All { !$dun.contains(e) } else { $alloc.contains(e) } { params.slowdown } else { n64(1.0) }).sum()
 			};
 			($sol:expr,$alloc:expr) => {
-				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && $alloc.contains(e) { params.slowdown } else { N64::try_from(1.0).unwrap() }).sum()
+				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && $alloc.contains(e) { params.slowdown } else { n64(1.0) }).sum()
 			};
 		}
 		for _mi in 0..params.annealing.main_iterations {
