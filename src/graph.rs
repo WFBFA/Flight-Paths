@@ -370,9 +370,6 @@ where
 		FP: Fn(&E) -> Option<P>,
 		FD: Fn(&E) -> E,
 	{
-		if DIRESPECT {
-			panic!("Eulirianization does not currently work consistently for mixed graphs");
-		}
 		let es0 = self.edge_count();
 		log::trace!("Eulirianizing {} edges", es0);
 		for i in 0..self.edges.len() {
