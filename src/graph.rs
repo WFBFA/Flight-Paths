@@ -384,19 +384,31 @@ where
 		}
 		let es1 = self.edge_count();
 		log::trace!("duped {} singular edges -> {}", es1-es0, es1);
-		while let Some((u, es)) = self.edges.iter().find(|(u, _)| !self.eulirian_compatible::<DIRESPECT>(**u)) {
-			let u = *u;
-			let epre = es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some());
-			let mut es: Vec<_> = if DIRESPECT {
-				let ind = es.iter().filter(|e| e.directed() && e.p2() == u).count();
-				let outd = es.iter().filter(|e| e.directed() && e.p1() == u).count();
-				epre.filter(|e| !e.directed() || (outd > ind && e.p2() == u) || (ind > outd && e.p1() == u)).collect()
-			} else {
-				epre.collect()
-			};
-			//TODO Better sorting heurisitic when directionality is respected 
-			es.sort_unstable_by_key(|e| (-((self.get_edges(e.p1()).len()%2+self.get_edges(e.p2()).len()%2) as isize), priority(e).unwrap()));
-			self.add_edge(dupe(es[0]));
+		if DIRESPECT {
+			let mut esd = HashSet::new();
+			for (_, es) in &self.edges {
+				for e in es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some()) {
+					esd.insert(e);
+				}
+			}
+			for e in esd.into_iter().map(|e| dupe(e)).collect::<Vec<_>>() {
+				self.add_edge(e);
+			}
+		} else {
+			while let Some((u, es)) = self.edges.iter().find(|(u, es)| !self.eulirian_compatible::<DIRESPECT>(**u) && es.iter().any(|e| !e.directed())) {
+				let u = *u;
+				let epre = es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some());
+				let mut es: Vec<_> = if DIRESPECT {
+					let ind = es.iter().filter(|e| e.directed() && e.p2() == u).count();
+					let outd = es.iter().filter(|e| e.directed() && e.p1() == u).count();
+					epre.filter(|e| !e.directed() || (outd > ind && e.p2() == u) || (ind > outd && e.p1() == u)).collect()
+				} else {
+					epre.collect()
+				};
+				//TODO Better sorting heurisitic when directionality is respected 
+				es.sort_unstable_by_key(|e| (-((self.get_edges(e.p1()).len()%2+self.get_edges(e.p2()).len()%2) as isize), priority(e).unwrap()));
+				self.add_edge(dupe(es[0]));
+			}
 		}
 		let es2 = self.edge_count();
 		log::trace!("duped {} additional edges -> {}", es2-es1, es2);
