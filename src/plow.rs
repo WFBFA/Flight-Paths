@@ -453,3 +453,140 @@ pub mod road {
 		}).collect()).collect())
 	}
 }
+
+/// Specialization for solving sidewalk plowing paths
+pub mod sidewalk {
+	use super::*;
+	use common::*;
+
+	#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+	enum SidewalkSide {
+		Wroom,
+		WroomOneWay,
+		Left,
+		Right
+	}
+	impl From<SidewalkSide> for Option<data::SidewalkSide> {
+		fn from(side: SidewalkSide) -> Self {
+			match side {
+				SidewalkSide::Left => Some(data::SidewalkSide::Left),
+				SidewalkSide::Right => Some(data::SidewalkSide::Right),
+				_ => None,
+			}
+		}
+	}
+	impl SidewalkSide {
+		fn is_road(self) -> bool {
+			self == Self::Wroom || self == Self::WroomOneWay
+		}
+		fn is_sidewalk(self) -> bool {
+			!self.is_road()
+		}
+	}
+
+	#[derive(Clone, Eq, Debug)]
+	struct RoadEdge {
+		p1: SID,
+		p2: SID,
+		discriminator: Option<SID>,
+		side: SidewalkSide,
+		length: N64,
+		iidx: u64,
+	}
+	impl PartialEq<RoadEdge> for RoadEdge {
+		fn eq(&self, other: &Self) -> bool {
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.side == other.side && self.iidx == other.iidx
+		}
+	}
+	impl std::hash::Hash for RoadEdge {
+		fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
+			(self.p1, self.p2, self.discriminator, self.side, self.iidx).hash(h)
+		}
+	}
+	impl Weighted for RoadEdge {
+		fn weight(&self) -> N64 {
+			self.length
+		}
+	}
+	impl Edge<SID> for RoadEdge {
+		fn p1(&self) -> SID {
+			self.p1
+		}
+		fn p2(&self) -> SID {
+			self.p2
+		}
+		fn directed(&self) -> bool {
+			self.side == SidewalkSide::WroomOneWay
+		}
+	}
+	impl RoadEdge {
+		fn duped(&self, other: &Self) -> bool {
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.side == other.side && self.iidx != other.iidx
+		}
+		fn dupe(&self) -> Self {
+			Self {
+				p1: self.p1,
+				p2: self.p2,
+				discriminator: self.discriminator,
+				side: self.side,
+				length: self.length,
+				iidx: self.iidx + 1,
+			}
+		}
+	}
+
+	/// Solves the snow plowing problem for roads.
+	///
+	/// Except it also converts all the data both ways and does other safety checks.
+	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: &Parameters) -> Result<data::SidewalkPaths, String> {
+		let sns: Vec<NodeId> = vehicles.sidewalk.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to located {:?}", l)))?.collect();
+		log::info!("Located vehicles");
+		log::debug!("{:?}", sns);
+		let mut g: PlowSolver<RoadNode, RoadEdge, _> = plow_solver!();
+		for n in roads.nodes.nodes {
+			g.graph = g.graph.add_node(n.into());
+		}
+		for e in roads.roads {
+			macro_rules! edge {
+				($side:expr) => {
+					RoadEdge {
+						p1: g.graph.id2nid(&e.p1).unwrap(),
+						p2: g.graph.id2nid(&e.p2).unwrap(),
+						discriminator: e.discriminator.as_ref().map(|id| g.graph.id2nid(id).unwrap()),
+						side: $side,
+						length: e.distance,
+						iidx: 0
+					}
+				}
+			}
+			g.graph.add_edge(edge!(if e.directed { SidewalkSide::WroomOneWay } else { SidewalkSide::Wroom }));
+			if e.sidewalks.0 {
+				g.graph.add_edge(edge!(SidewalkSide::Left));
+			}
+			if e.sidewalks.1 {
+				g.graph.add_edge(edge!(SidewalkSide::Right));
+			}
+		}
+		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
+		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
+		g.graph.graph.eulirianize::<_, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
+		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
+			log::debug!("Default snow level {:.5} - every sidewalk counts!", _snow_d);
+			g.graph.graph.edges().filter(|e| e.side.is_sidewalk() && e.iidx == 0).collect()
+		} else {
+			snow.into_iter().filter(|s| s.depth > 0.0).try_map_all(|s| {
+				let p1 = g.graph.id2nid(&s.p1).ok_or_else(|| format!("Snow status node {} not found", s.p1))?;
+				let p2 = g.graph.id2nid(&s.p2).ok_or_else(|| format!("Snow status node {} not found", s.p2))?;
+				let discr = s.discriminator.map(|d| g.graph.id2nid(&d).unwrap());
+				Result::<_,String>::Ok(g.graph.graph.get_edges_between(p1, p2).into_iter().filter(|e| e.discriminator == discr && e.side.is_sidewalk() && e.iidx == 0).collect::<Vec<_>>())
+			})?.flatten().collect()
+		};
+		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
+		let solution = g.solve::<true>(&sns, &locations, &snowy, params);
+		Ok(solution.into_iter().zip(sns.into_iter()).map(|(path, n)| Graph::<SID, RoadNode, RoadEdge>::path_to_nodes(path.into_iter(), n).into_iter().map(|(u, e)| data::SidewalkPathSegment {
+			node: g.graph.nid2id(u).unwrap().clone(),
+			discriminator: e.and_then(|e| e.discriminator).map(|d| g.graph.nid2id(d).unwrap().clone()),
+			side: e.unwrap().side.into(),
+		}).collect()).collect())
+	}
+}

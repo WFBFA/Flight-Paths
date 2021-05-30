@@ -108,7 +108,11 @@ fn main() -> std::io::Result<()> {
 										.takes_value(true)
 										.default_value("0")
 										.validator(|s| s.parse::<f64>().map(|_| ()).map_err(|e| e.to_string()))
-										.help("Default snow depth")))
+										.help("Default snow depth"))	
+								.arg(Arg::with_name("sidewalks")
+									.short("w")
+									.takes_value(false)
+									.help("Clean sidewalks")))
 							.subcommand(SubCommand::with_name("geojson")
 								.about("Convert anything into GeoJSONs")
 								.arg(Arg::with_name("road-graph")
@@ -158,9 +162,15 @@ fn main() -> std::io::Result<()> {
 		let vehicles: data::VehiclesConfiguration = serde_json::from_reader(&std::fs::File::open(matches.value_of("vehicles").unwrap())?).expect("Meta parameters invalid JSON");
 		let params: meta::Parameters = serde_yaml::from_reader(&std::fs::File::open(matches.value_of("meta").unwrap())?).expect("Meta parameters invalid JSON");
 		log::info!("Loaded configuration");
-		let paths = plow::road::solve(roads, snow, matches.value_of("snow-d").map(|f| f.parse().unwrap()), vehicles, &params).unwrap();
-		log::info!("Constructed paths");
-		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
+		if matches.is_present("sidewalks") {
+			let paths = plow::sidewalk::solve(roads, snow, matches.value_of("snow-d").map(|f| f.parse().unwrap()), vehicles, &params).unwrap();
+			log::info!("Constructed paths");
+			serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
+		} else {
+			let paths = plow::road::solve(roads, snow, matches.value_of("snow-d").map(|f| f.parse().unwrap()), vehicles, &params).unwrap();
+			log::info!("Constructed paths");
+			serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
+		}
 	} else if let Some(matches) = matches.subcommand_matches("geojson") {
 		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
 		let pref = matches.value_of("prefix").unwrap();
