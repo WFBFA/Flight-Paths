@@ -1,3 +1,7 @@
+//! # _make 'em fly & make 'em plow_
+//!
+//! Universal CLI for solving flight & plow problems, as well as converting spec'd data to/from GeoJSON.
+
 use std::borrow::Cow;
 
 use clap::{App, Arg, SubCommand, crate_version};
