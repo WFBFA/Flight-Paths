@@ -157,6 +157,7 @@ where
 			-(es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed() && !e.is_cyclic()).count() as isize
 		} else {
 			es.iter().filter(|e| !e.is_cyclic()).count() as isize
+			// es.len() as isize //the code above is SLOW!!! we're talking x60 slowdown of undirected eulirinization process!... but you know... the above is like, correct and stuff
 		}
 	}
 	/// Check whether given node does not prevent the graph from being eulirian
