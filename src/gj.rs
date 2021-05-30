@@ -1,3 +1,8 @@
+//! GeoJSON conversion functions
+//!
+//! Converts "proprietary" data (in JSON following the [Spec](https://github.com/WFBFA/Spec)) to GeoJSON, mainly for visualization.
+//! In some cases the conversion is reverisble, in which case GeoJSON to data converters are provided.
+
 use crate::*;
 use data::*;
 use geo::{GeometryCollection, intersects::Intersects};

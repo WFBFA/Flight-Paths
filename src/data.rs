@@ -1,3 +1,5 @@
+//! Crusty data types for the [Specification](https://github.com/WFBFA/Specs)
+
 use std::convert::TryFrom;
 
 use crate::*;
@@ -58,12 +60,14 @@ pub struct RoadGraphNodes {
 }
 
 impl RoadGraphNodes {
+	/// Locates a location to the node on the graph
 	pub fn locate(&self, l: &Location) -> Option<NodeId> {
 		match l {
 			Location::Coordinates(lon, lat) => self.nodes.iter().min_by_key(|Node {coordinates, ..}| n64((*lon, *lat).distance(coordinates))).map(|n| n.id.clone()),
 			Location::Node(n) => Some(n.clone()),
 		}
 	}
+	/// Locates a location to geographical coordinates
 	pub fn dislocate(&self, l: &Location) -> geo::Geometry<f64> {
 		match l {
 			Location::Coordinates(lon, lat) => geo::Point::from((*lon, *lat)).into(),
