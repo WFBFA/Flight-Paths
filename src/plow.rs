@@ -2,7 +2,7 @@ use crate::*;
 use graph::*;
 use graph::adapt::*;
 use data::Distance;
-use brr::meta::*;
+use meta::*;
 
 use std::{collections::HashSet, convert::TryFrom};
 use itertools::Itertools;

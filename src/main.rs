@@ -4,6 +4,7 @@ use clap::{App, Arg, SubCommand, crate_version};
 mod data;
 mod graph;
 mod brr;
+mod meta;
 mod plow;
 mod gj;
 pub use try_all::{TryAll, TryMapAll};
@@ -144,7 +145,7 @@ fn main() -> std::io::Result<()> {
 		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph config invalid JSON");
 		let snow: data::SnowStatuses = serde_json::from_reader(&std::fs::File::open(matches.value_of("snow").unwrap())?).expect("Snow status config invalid JSON");
 		let vehicles: data::VehiclesConfiguration = serde_json::from_reader(&std::fs::File::open(matches.value_of("vehicles").unwrap())?).expect("Meta parameters invalid JSON");
-		let params: brr::meta::Parameters = serde_yaml::from_reader(&std::fs::File::open(matches.value_of("meta").unwrap())?).expect("Meta parameters invalid JSON");
+		let params: meta::Parameters = serde_yaml::from_reader(&std::fs::File::open(matches.value_of("meta").unwrap())?).expect("Meta parameters invalid JSON");
 		log::info!("Loaded configuration");
 		let paths = plow::road::solve(roads, snow, matches.value_of("snow-d").map(|f| f.parse().unwrap()), vehicles, &params).unwrap();
 		log::info!("Constructed paths");
