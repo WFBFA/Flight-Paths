@@ -48,10 +48,15 @@ fn main() -> std::io::Result<()> {
 										.required(true)
 										.index(2)
 										.help("Drones configuration JSON"))
-								.arg(Arg::with_name("output")
+								.arg(Arg::with_name("meta")
 										.takes_value(true)
 										.required(true)
 										.index(3)
+										.help("Meta parameters"))
+								.arg(Arg::with_name("output")
+										.takes_value(true)
+										.required(true)
+										.index(4)
 										.help("Output JSON"))
 							)
 							.subcommand(SubCommand::with_name("snows")
@@ -128,8 +133,9 @@ fn main() -> std::io::Result<()> {
 		log::trace!("tracing enabled");
 		let drones: data::Drones = serde_json::from_reader(&std::fs::File::open(matches.value_of("drones").unwrap())?).expect("Drones config invalid JSON");
 		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph invalid JSON");
+		let params: meta::Parameters = serde_yaml::from_reader(&std::fs::File::open(matches.value_of("meta").unwrap())?).expect("Meta parameters invalid JSON");
 		log::info!("Loaded configuration");
-		let paths = brr::construct_flight_paths(roads, &drones).unwrap();
+		let paths = plow::fly::solve(roads, drones, &params).unwrap();
 		log::info!("Constructed paths");
 		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
 	} else if let Some(matches) = matches.subcommand_matches("snows") {

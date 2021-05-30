@@ -239,14 +239,14 @@ where
 	}
 }
 
-/// Specialization for solving road plowing paths
-pub mod road {
+/// Common specialization thingies
+mod common {
 	use super::*;
 
 	#[derive(Clone, Debug)]
-	struct RoadNode {
-		id: NodeId,
-		coordinates: Coords,
+	pub struct RoadNode {
+		pub id: NodeId,
+		pub coordinates: Coords,
 	}
 	impl IdentifiableNode for RoadNode {
 		type Id = NodeId;
@@ -267,6 +267,96 @@ pub mod road {
 			}
 		}
 	}
+}
+
+/// Specialization for solving flying surveing paths
+pub mod fly {
+	use super::*;
+	use common::*;
+	
+	#[derive(Clone, Eq, Debug)]
+	struct RoadEdge {
+		p1: SID,
+		p2: SID,
+		discriminator: Option<SID>,
+		length: N64,
+		iidx: u64,
+	}
+	impl PartialEq<RoadEdge> for RoadEdge {
+		fn eq(&self, other: &Self) -> bool {
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx == other.iidx
+		}
+	}
+	impl std::hash::Hash for RoadEdge {
+		fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
+			(self.p1, self.p2, self.discriminator, self.iidx).hash(h)
+		}
+	}
+	impl Weighted for RoadEdge {
+		fn weight(&self) -> N64 {
+			self.length
+		}
+	}
+	impl Edge<SID> for RoadEdge {
+		fn p1(&self) -> SID {
+			self.p1
+		}
+		fn p2(&self) -> SID {
+			self.p2
+		}
+		fn directed(&self) -> bool {
+			false
+		}
+	}
+	impl RoadEdge {
+		fn duped(&self, other: &Self) -> bool {
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx != other.iidx
+		}
+		fn dupe(&self) -> Self {
+			Self {
+				p1: self.p1,
+				p2: self.p2,
+				discriminator: self.discriminator,
+				length: self.length,
+				iidx: self.iidx + 1,
+			}
+		}
+	}
+
+	/// Solves the pathing problem for brrr drones
+	pub fn solve(roads: data::RoadGraph, drones: data::Drones, params: &Parameters) -> Result<data::Paths, String> {
+		let sns: Vec<NodeId> = drones.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to locate {:?}", l)))?.collect();
+		log::info!("Located drones");
+		log::debug!("{:?}", sns);
+		let mut g: PlowSolver<RoadNode, RoadEdge, _> = plow_solver!();
+		for n in roads.nodes.nodes {
+			g.graph = g.graph.add_node(n.into());
+		}
+		for e in roads.roads {
+			g.graph.add_edge(RoadEdge {
+				p1: g.graph.id2nid(&e.p1).unwrap(),
+				p2: g.graph.id2nid(&e.p2).unwrap(),
+				discriminator: e.discriminator.map(|id| g.graph.id2nid(&id).unwrap()),
+				length: e.distance,
+				iidx: 0
+			});
+		}
+		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
+		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
+		g.graph.graph.eulirianize::<_, _, _, _, false>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
+		log::debug!("Constructed graph with {} nodes, {} segments and {} drones", g.graph.graph.node_count(), g.graph.graph.edge_count(), sns.len());
+		let solution = g.solve::<false>(&sns, &locations, &g.graph.graph.edges().collect(), params);
+		Ok(solution.into_iter().zip(sns.into_iter()).map(|(path, n)| Graph::<SID, RoadNode, RoadEdge>::path_to_nodes(path.into_iter(), n).into_iter().map(|(u, e)| data::PathSegment {
+			node: g.graph.nid2id(u).unwrap().clone(),
+			discriminator: e.and_then(|e| e.discriminator).map(|d| g.graph.nid2id(d).unwrap().clone()),
+		}).collect()).collect())
+	}
+}
+
+/// Specialization for solving road plowing paths
+pub mod road {
+	use super::*;
+	use common::*;
 
 	#[derive(Clone, Eq, Debug)]
 	struct RoadEdge {
