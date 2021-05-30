@@ -308,7 +308,7 @@ where
 				return Some(path);
 			}
 			for e in self.get_edges(u) {
-				if !path.contains(&e) && (!DIRESPECT || !e.directed() || e.p1() == u) {
+				if !path.contains(&e) && e.is_outgoing::<DIRESPECT>(u) {
 					if let Some(ed) = weight(e) {
 						let mut path = path.clone();
 						path.push(e);
