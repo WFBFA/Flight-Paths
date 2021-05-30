@@ -321,7 +321,7 @@ where
 	}
 	/// Fixes all sad edges
 	///
-	/// A sad edge is an edge(s) that outright prevents Eulirinization of the graph.
+	/// A sad edge is an edge(s) that outright prevents Eulirinization of the graph, even after SCC patch.
 	///
 	/// Type Parameters:
 	/// - `DIRESPECT`: whether the directionality of edges is respected (sad edges can only exist in mixed graphs, calling this without respect is no-op)
@@ -334,11 +334,10 @@ where
 	{
 		if DIRESPECT {
 			let mut redir = HashSet::new();
-			for (u, es) in &self.edges {
-				let u = *u;
-				if es.len() > 0 && es.iter().all(|e| e.directed()) {
+			for (_, es) in &self.edges {
+				if es.len() == 1 {
 					let e = es.iter().next().unwrap();
-					if es.iter().all(|ee| ee.is_incoming::<DIRESPECT>(u) == e.is_incoming::<DIRESPECT>(u) && ee.is_outgoing::<DIRESPECT>(u) == e.is_outgoing::<DIRESPECT>(u)) {
+					if e.directed() {
 						redir.insert(e.clone());
 					}
 				}
