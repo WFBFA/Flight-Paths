@@ -1,13 +1,12 @@
 use std::borrow::Cow;
 
-mod f64nn;
 use clap::{App, Arg, SubCommand, crate_version};
-use f64nn::*;
 mod data;
 mod graph;
 mod brr;
 mod plow;
 mod gj;
+pub use noisy_float::prelude::{N64, n64, Float};
 
 pub type NodeId = Cow<'static, str>;
 

@@ -16,7 +16,7 @@ trait Positioned {
 }
 
 trait Weighted {
-	fn weight(&self) -> f64s;
+	fn weight(&self) -> N64;
 }
 
 struct PlowSolver<N, E, Gen>
@@ -44,7 +44,7 @@ where
 	/// allocates all snowy edges to some vehicle
 	/// uses positions of vehicles as gravicenters of allocation clusters
 	fn initial_allocation<'a>(&'a self, locs: &Vec<Coords>, snowy: impl Iterator<Item = &'a E>) -> Vec<HashSet<&'a E>> {
-		let closest = |c: &(f64, f64)| (0..locs.len()).zip(locs.iter()).min_by_key(|(_, c2)| f64s::try_from(c.distance(*c2)).unwrap()).unwrap().0;
+		let closest = |c: &(f64, f64)| (0..locs.len()).zip(locs.iter()).min_by_key(|(_, c2)| N64::try_from(c.distance(*c2)).unwrap()).unwrap().0;
 		let mut allocations: Vec<_> = (0..locs.len()).map(|_| HashSet::new()).collect();
 		for e in snowy {
 			let lv1 = closest(&self.graph.nid2node(e.p1()).unwrap().pos());
@@ -81,21 +81,21 @@ where
 		let mut solution: Vec<Vec<&'a E>> = (0..vs).map(|_| Vec::new()).collect();
 		log::debug!("Initialized allocations: {}", alloc.iter().map(|a| a.len()).join("/"));
 		let mut rng = rand::thread_rng();
-		let mut cost_max_best = f64s::INFINITY;
-		let mut value_best = f64s::INFINITY;
+		let mut cost_max_best = N64::infinity();
+		let mut value_best = N64::infinity();
 		let mut temperature: f64 = params.annealing.starting_temperature;
 		let mut ii = 0u64;
 		let mut order: Vec<_> = (0..vs).collect();
 		macro_rules! cycle_cost_compute {
 			($sol:expr,$alloc:expr,$dun:expr) => {
-				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && if params.clearing == Clearing::All { !$dun.contains(e) } else { $alloc.contains(e) } { params.slowdown } else { f64s::try_from(1.0).unwrap() }).sum()
+				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && if params.clearing == Clearing::All { !$dun.contains(e) } else { $alloc.contains(e) } { params.slowdown } else { N64::try_from(1.0).unwrap() }).sum()
 			};
 			($sol:expr,$alloc:expr) => {
-				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && $alloc.contains(e) { params.slowdown } else { f64s::try_from(1.0).unwrap() }).sum()
+				$sol.iter().map(|e| e.weight() * if snowy.contains(e) && $alloc.contains(e) { params.slowdown } else { N64::try_from(1.0).unwrap() }).sum()
 			};
 		}
 		for _mi in 0..params.annealing.main_iterations {
-			log::debug!("iteration {} current best {:.1}", _mi, value_best.f());
+			log::debug!("iteration {} current best {:.1}", _mi, value_best);
 			//Try to improve allocations
 			//TODO? change alloc
 			//Shuffle evaluation order
@@ -112,10 +112,10 @@ where
 			log::debug!(" new order: {:?}", order);
 			//Provide new solutions
 			let mut sol_next: Vec<_> = (0..vs).map(|_| Vec::new()).collect();
-			let mut cost_next_all = f64s::ZERO;
-			let mut cost_next_max = f64s::ZERO;
+			let mut cost_next_all = n64(0.0);
+			let mut cost_next_max = n64(0.0);
 			let mut costs_next = Vec::new();
-			costs_next.resize(vs, f64s::ZERO);
+			costs_next.resize(vs, n64(0.0));
 			let mut dun = HashSet::new();
 			for i in &order {
 				let i = *i;
@@ -185,10 +185,10 @@ where
 				}
 				//Evaluate improvements
 				let sol_improv = sol_improv;
-				let mut cost_improv_all = f64s::ZERO;
-				let mut cost_improv_max = f64s::ZERO;
+				let mut cost_improv_all = n64(0.0);
+				let mut cost_improv_max = n64(0.0);
 				let mut costs_improv = Vec::new();
-				costs_improv.resize(vs, f64s::ZERO);
+				costs_improv.resize(vs, n64(0.0));
 				for i in 0..vs {
 					let cost = cycle_cost_compute!(sol_improv[i], alloc[i]);
 					costs_improv[i] = cost;
@@ -201,7 +201,7 @@ where
 				let value_improv = params.weight_total*cost_next_all + params.weight_max*cost_next_max;
 				log::debug!(" new value: {:.5} costs: {}", value_improv, costs_improv.iter().join("|"));
 				//if the improved solution is actually better, or with some chance anyway, keep it
-				if value_improv < value_best || (value_improv <= value_best && cost_improv_max < cost_max_best) || (value_improv < value_next && rng.gen_range(0.0..1.0) < ((value_improv-value_next).f()/temperature).exp()) {
+				if value_improv < value_best || (value_improv <= value_best && cost_improv_max < cost_max_best) || (value_improv < value_next && n64(rng.gen_range(0.0..1.0)) < ((value_improv-value_next)/temperature).exp()) {
 					log::debug!(" improvements accepted");
 					solution = sol_improv;
 					value_best = value_improv;
@@ -255,7 +255,7 @@ pub mod road {
 		p2: SID,
 		discriminator: Option<SID>,
 		directed: bool,
-		length: f64s,
+		length: N64,
 		iidx: u64,
 	}
 	impl PartialEq<RoadEdge> for RoadEdge {
@@ -269,7 +269,7 @@ pub mod road {
 		}
 	}
 	impl Weighted for RoadEdge {
-		fn weight(&self) -> f64s {
+		fn weight(&self) -> N64 {
 			self.length
 		}
 	}
@@ -328,7 +328,7 @@ pub mod road {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
 			g.graph.graph.edges().collect()
 		} else {
-			snow.into_iter().filter(|s| s.depth.f() > 0.0).map(|s| {
+			snow.into_iter().filter(|s| s.depth > 0.0).map(|s| {
 				let p1 = g.graph.id2nid(&s.p1).unwrap();
 				let p2 = g.graph.id2nid(&s.p2).unwrap();
 				let discr = s.discriminator.map(|d| g.graph.id2nid(&d).unwrap());

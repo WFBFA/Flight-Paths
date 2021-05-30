@@ -22,7 +22,7 @@ pub struct RoadSegment {
 	pub p2: NodeId,
 	pub discriminator: Option<NodeId>,
 	pub directed: bool,
-	pub distance: f64s,
+	pub distance: N64,
 	pub sidewalks: (bool, bool),
 }
 
@@ -60,7 +60,7 @@ pub struct RoadGraphNodes {
 impl RoadGraphNodes {
 	pub fn locate(&self, l: &Location) -> Option<NodeId> {
 		match l {
-			Location::Coordinates(lon, lat) => self.nodes.iter().min_by_key(|Node {coordinates, ..}| f64s::try_from((*lon, *lat).distance(coordinates)).unwrap()).map(|n| n.id.clone()),
+			Location::Coordinates(lon, lat) => self.nodes.iter().min_by_key(|Node {coordinates, ..}| N64::try_from((*lon, *lat).distance(coordinates)).unwrap()).map(|n| n.id.clone()),
 			Location::Node(n) => Some(n.clone()),
 		}
 	}
@@ -108,7 +108,7 @@ pub struct SnowStatusElement {
 	pub p1: NodeId,
 	pub p2: NodeId,
 	pub discriminator: Option<NodeId>,
-	pub depth: f64s,
+	pub depth: N64,
 }
 
 pub type SnowStatuses = Vec<SnowStatusElement>;

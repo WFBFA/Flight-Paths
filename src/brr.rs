@@ -11,7 +11,7 @@ struct Edge {
 	p2: NodeId,
 	discriminator: Option<NodeId>,
 	directed: bool,
-	length: f64s,
+	length: N64,
 	iidx: u64,
 }
 impl Edge {
@@ -67,7 +67,7 @@ impl std::hash::Hash for Edge {
 }
 impl std::fmt::Display for Edge {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "({} - {} v{} #{}# {:.1}m)", self.p1, self.p2, self.discriminator.as_ref().map(|s| s.as_ref()).unwrap_or("-"), self.iidx, self.length.f())
+		write!(f, "({} - {} v{} #{}# {:.1}m)", self.p1, self.p2, self.discriminator.as_ref().map(|s| s.as_ref()).unwrap_or("-"), self.iidx, self.length)
 	}
 }
 
@@ -149,8 +149,8 @@ fn kreek<const DIRESPECT: bool>(mut g: Graph) -> Result<Graph, String> {
 /// Find shortest non-trivial cycle on a vertex
 fn bicycle<const DIRESPECT: bool>(g: &Graph, n0: &NodeId, pred: Option<&dyn Fn(&Rc<Edge>) -> bool>) -> Option<Path> {
 	log::trace!("cycling on {} d {}", n0, combined_degree::<DIRESPECT>(n0, g.get(n0).unwrap()));
-	let mut q: PriorityQueue<(NodeId, Path), f64s> = PriorityQueue::new();
-	q.push((n0.clone(), vec![]), f64s::ZERO);
+	let mut q: PriorityQueue<(NodeId, Path), N64> = PriorityQueue::new();
+	q.push((n0.clone(), vec![]), n64(0.0));
 	while let Some(((n, path), d)) = q.pop() {
 		// log::trace!("{} {}", n, path.len());
 		if &n == n0 && path.len() > 0 {
@@ -183,7 +183,7 @@ fn graph_find_edges(g: &Graph, p1: &NodeId, p2: &NodeId) -> Vec<Rc<Edge>> {
 	g.get(p1).map_or(vec![], |es| es.iter().filter_map(|e| if e.other(p1) == p2 { Some(e.clone()) } else { None }).collect())
 }
 
-fn path_length(path: &Path) -> f64s {
+fn path_length(path: &Path) -> N64 {
 	path.iter().map(|e| e.length).sum()
 }
 
@@ -255,11 +255,11 @@ pub fn construct_flight_paths(roads: data::RoadGraph, drones: &data::Drones) -> 
 pub fn merge_snow_statuses(snows: impl Iterator<Item = data::SnowStatusElement>) -> data::SnowStatuses {
 	let mut keyed = IndexMap::new();
 	for s in snows {
-		let entry = keyed.entry((s.p1, s.p2, s.discriminator)).or_insert(f64s::ZERO);
-		if *entry <= f64s::ZERO || s.depth <= f64s::ZERO {
+		let entry = keyed.entry((s.p1, s.p2, s.discriminator)).or_insert(n64(0.0));
+		if *entry <= n64(0.0) || s.depth <= n64(0.0) {
 			*entry = max(*entry, s.depth);
 		} else {
-			*entry = ((entry.f() + s.depth.f()) / 2.0).try_into().unwrap();
+			*entry = (*entry + s.depth) / n64(2.0);
 		}
 	}
 	keyed.into_iter().map(|((p1, p2, discriminator), depth)| data::SnowStatusElement { p1, p2, discriminator, depth }).collect()
@@ -322,9 +322,9 @@ pub mod meta {
 		pub reorder: Reorder, //ChV
 		pub realloc: Realloc, //MV
 		pub annealing: Annealing,
-		pub slowdown: f64s,
-		pub weight_total: f64s,
-		pub weight_max: f64s,
+		pub slowdown: N64,
+		pub weight_total: N64,
+		pub weight_max: N64,
 	}
 }
 
