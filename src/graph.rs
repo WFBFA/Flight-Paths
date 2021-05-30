@@ -325,6 +325,8 @@ where
 		FP: Fn(&E) -> Option<P>,
 		FD: Fn(&E) -> E,
 	{
+		let es0 = self.edge_count();
+		log::trace!("Eulirianizing {} edges", es0);
 		for i in 0..self.edges.len() {
 			let (u, es) = self.edges.get_index(i).unwrap();
 			if es.len() == 1 {
@@ -335,6 +337,8 @@ where
 				self.add_edge(dupe(e));
 			}
 		}
+		let es1 = self.edge_count();
+		log::trace!("duped {} singular edges -> {}", es1-es0, es1);
 		while let Some((u, es)) = self.edges.iter().find(|(u, _)| !self.eulirian_compatible::<DIRESPECT>(**u)) {
 			let u = *u;
 			let epre = es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some());
@@ -349,6 +353,8 @@ where
 			es.sort_unstable_by_key(|e| (-((self.get_edges(e.p1()).len()%2+self.get_edges(e.p2()).len()%2) as isize), priority(e).unwrap()));
 			self.add_edge(dupe(es[0]));
 		}
+		let es2 = self.edge_count();
+		log::trace!("duped {} additional edges -> {}", es2-es1, es2);
 		Ok(())
 	}
 	/// Converts a path consisting of successive edges to successively visited nodes (with associated edges).
