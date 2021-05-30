@@ -385,13 +385,30 @@ where
 		let es1 = self.edge_count();
 		log::trace!("duped {} singular edges -> {}", es1-es0, es1);
 		if DIRESPECT {
-			let mut esd = HashSet::new();
-			for (_, es) in &self.edges {
+			use std::cmp::max;
+			let mut esd: HashMap<_, usize> = HashMap::new();
+			for (u, es) in &self.edges {
+				let u = *u;
+				let ud = es.iter().filter(|e| !e.directed()).count();
+				let ind = es.iter().filter(|e| e.directed() && e.p2() == u).count();
+				let outd = es.iter().filter(|e| e.directed() && e.p1() == u).count();
+				let advd = ind+outd;
 				for e in es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some()) {
-					esd.insert(e);
+					let c = if e.directed() {
+						if e.p1() == u { outd/(ind+ud) } else { ind/(outd+ud) }
+					} else { advd/ud };
+					let ec = esd.entry(e).or_insert(1);
+					*ec = std::cmp::max(*ec, c);
 				}
 			}
-			for e in esd.into_iter().map(|e| dupe(e)).collect::<Vec<_>>() {
+			let mut add = Vec::new();
+			for (mut e, c) in esd {
+				for _ in 0..c {
+					add.push(dupe(e));
+					e = add.last().unwrap();
+				}
+			}
+			for e in add {
 				self.add_edge(e);
 			}
 		} else {
