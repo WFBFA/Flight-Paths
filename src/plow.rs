@@ -433,7 +433,7 @@ pub mod road {
 		}
 		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
-		g.graph.graph.eulirianize::<_, _, _, _, false>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
+		g.graph.graph.eulirianize::<_, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
 			g.graph.graph.edges().collect()
@@ -446,7 +446,7 @@ pub mod road {
 			})?.collect()
 		};
 		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
-		let solution = g.solve::<false>(&sns, &locations, &snowy, params);
+		let solution = g.solve::<true>(&sns, &locations, &snowy, params);
 		Ok(solution.into_iter().zip(sns.into_iter()).map(|(path, n)| Graph::<SID, RoadNode, RoadEdge>::path_to_nodes(path.into_iter(), n).into_iter().map(|(u, e)| data::PathSegment {
 			node: g.graph.nid2id(u).unwrap().clone(),
 			discriminator: e.and_then(|e| e.discriminator).map(|d| g.graph.nid2id(d).unwrap().clone()),
@@ -569,7 +569,7 @@ pub mod sidewalk {
 		}
 		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
-		g.graph.graph.eulirianize::<_, _, _, _, false>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
+		g.graph.graph.eulirianize::<_, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every sidewalk counts!", _snow_d);
 			g.graph.graph.edges().filter(|e| e.side.is_sidewalk() && e.iidx == 0).collect()
@@ -582,7 +582,7 @@ pub mod sidewalk {
 			})?.flatten().collect()
 		};
 		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
-		let solution = g.solve::<false>(&sns, &locations, &snowy, params);
+		let solution = g.solve::<true>(&sns, &locations, &snowy, params);
 		Ok(solution.into_iter().zip(sns.into_iter()).map(|(path, n)| Graph::<SID, RoadNode, RoadEdge>::path_to_nodes(path.into_iter(), n).into_iter().map(|(u, e)| data::SidewalkPathSegment {
 			node: g.graph.nid2id(u).unwrap().clone(),
 			discriminator: e.and_then(|e| e.discriminator).map(|d| g.graph.nid2id(d).unwrap().clone()),
