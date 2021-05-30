@@ -1,15 +1,29 @@
+//! Data structures and algorithms to operate on mixed generic graphs.
+//! 
+//! Historically, this was built after the algorithms in `brr` proved themselves worthy,
+//! but the implementation was not sufficiently generic to be re-used for road, and then sidewalk, plowing.
+
 use std::{collections::{HashMap, HashSet}, hash::Hash};
 
 use indexmap::IndexMap;
 use priority_queue::PriorityQueue;
 
+/// An edge of a graph
+///
+/// Type Parameters:
+/// - `NId`: node id
 pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq + Eq {
+	/// First (starting) vertex
 	fn p1(&self) -> NId;
+	/// Second (ending) vertex
 	fn p2(&self) -> NId;
+	/// Whether the edge is directed, i.e. can only be traversed `p1`→`p2`
 	fn directed(&self) -> bool;
+	/// Whether the edge is cyclic, i.e. goes from a vertex to itself
 	fn is_cyclic(&self) -> bool {
 		self.p1() == self.p2()
 	}
+	/// Assuming `id` is one end of the edge, what is the other end
 	fn other(&self, id: NId) -> NId {
 		if id == self.p1() {
 			self.p2()
@@ -17,14 +31,28 @@ pub trait Edge<NId: Clone + Copy + Hash + Eq> : Clone + Hash + PartialEq + Eq {
 			self.p1()
 		}
 	}
+	/// Whether one can traverse the edge and end up in the specified node
+	///
+	/// Type Parameters:
+	/// - `DIRESPECT`: whether the directionality of the edge is respected
 	fn is_incoming<const DIRESPECT: bool>(&self, id: NId) -> bool {
 		id == self.p2() || (id == self.p1() && (!DIRESPECT || !self.directed()))
 	}
+	/// Whether one can traverse the edge starting from the specified node
+	///
+	/// Type Parameters:
+	/// - `DIRESPECT`: whether the directionality of the edge is respected
 	fn is_outgoing<const DIRESPECT: bool>(&self, id: NId) -> bool {
 		id == self.p1() || (id == self.p2() && (!DIRESPECT || !self.directed()))
 	}
 }
 
+/// A graph
+///
+/// Type Parameters:
+/// - `NId`: (lightweight) node id type
+/// - `N`: Node type (can contain arbitrary node information)
+/// - `E`: Edge type
 #[derive(Clone, Debug)]
 pub struct Graph<NId, N, E> 
 where 
@@ -33,6 +61,7 @@ where
 {
 	nodes: HashMap<NId, N>,
 	edges: IndexMap<NId, HashSet<E>>,
+	/// An always empty set of edges (useful for [`get_edges`] on a non-existing node)
 	_empty: HashSet<E>,
 }
 
@@ -55,33 +84,43 @@ where
 	NId: Clone + Copy + Hash + Eq,
 	E: Edge<NId>,
 {
+	/// Constructs new graph with `nodes` and `edges`
 	pub fn new(nodes: HashMap<NId, N>, edges: IndexMap<NId, HashSet<E>>) -> Self {
 		Self { nodes, edges, ..Default::default() }
 	}
+	/// Get node by id
 	pub fn get_node(&self, n: NId) -> Option<&N> {
 		self.nodes.get(&n)
 	}
+	/// Get all edges of a node
 	pub fn get_edges(&self, n: NId) -> &HashSet<E> {
 		self.edges.get(&n).unwrap_or(&self._empty)
 	}
+	/// Get all edges between 2 nodes
 	pub fn get_edges_between(&self, n1: NId, n2: NId) -> Vec<&E> {
 		self.edges.get(&n1).iter().flat_map(|es| es.iter()).filter(|e| e.other(n1) == n2).collect()
 	}
+	/// Get all nodes
 	pub fn nodes(&self) -> impl Iterator<Item=(NId,&N)> {
 		self.nodes.iter().map(|(id, n)| (*id, n))
 	}
+	/// Get all edges
 	pub fn edges(&self) -> impl Iterator<Item=&E> {
 		self.edges.iter().flat_map(|(n, es)| es.iter().filter(move |e| e.is_cyclic() || e.p1() == *n))
 	}
+	/// Number of nodes
 	pub fn node_count(&self) -> usize {
 		self.nodes.len()
 	}
+	/// Number of edges
 	pub fn edge_count(&self) -> usize {
 		self.edges().count()
 	}
+	/// Whether the graph is empty
 	pub fn is_empty(&self) -> bool {
 		self.nodes.is_empty()
 	}
+	/// Whether the graph has no edges
 	pub fn is_edge_empty(&self) -> bool {
 		self.edges.values().all(HashSet::is_empty)
 	}
@@ -103,6 +142,15 @@ where
 		}
 	}
 	/// Calculate combined degree of a vertex
+	///
+	/// - For an undirected graph, combined degree is "simply" degree - aka number of edges at the vertex.
+	/// - For a directed graph, combined degree is gradient/flow degree - aka outgoing minus incoming edges.
+	/// - For a mixed graph, combined degree is negative absolute strict gradient degree balanced by undirected edges. In proper words, how many undirected edges the node lacks/has extra for/after bailing out disbalance of directed edges.
+	///
+	/// Since we're dealing with only undirected or mixed graphs (specified by `DIRESPECT`), only 1st or 3rd value is returned resp.
+	///
+	/// Type Parameters:
+	/// - `DIRESPECT`: whether the directionality of edges is respected
 	pub fn degree<const DIRESPECT: bool>(&self, n: NId) -> isize {
 		let es = self.get_edges(n);
 		if DIRESPECT {
@@ -111,12 +159,25 @@ where
 			es.iter().filter(|e| !e.is_cyclic()).count() as isize
 		}
 	}
-	/// Check whether given node does not prevent a graph from being eulirian
+	/// Check whether given node does not prevent the graph from being eulirian
 	pub fn eulirian_compatible<const DIRESPECT: bool>(&self, n: NId) -> bool {
 		let d = self.degree::<DIRESPECT>(n);
 		d % 2 == 0 && (!DIRESPECT || d >= 0)
 	}
-	/// Find shortest path between 2 points
+	/// Find shortest path between 2 points, edge-weighted by a function
+	///
+	/// Currently uses heap-optimized Dijkstra's shortest path algorithm.
+	///
+	/// Type Parameters:
+	/// - `Weight`: weight of an edge
+	/// - `DIRESPECT`: whether the directionality of edges is respected
+	///
+	/// Arguments:
+	/// - `n1`: first node
+	/// - `n2`: second node
+	/// - `weight`: filtering weight function - returns the weight of the edge, iff it can be traversed
+	///
+	/// Returns: edges path from `n1` to `n2`, if such exists
 	pub fn pathfind<Weight, FW, const DIRESPECT: bool>(&self, n1: NId, n2: NId, weight: FW) -> Option<Vec<&E>>
 	where
 		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
@@ -153,7 +214,20 @@ where
 		}
 		None
 	}
-	/// Find shortest path between 2 regions
+	/// Find shortest path between 2 regions, edge-weighted by a function
+	///
+	/// Currently uses heap-optimized Dijkstra's shortest path algorithm.
+	///
+	/// Type Parameters:
+	/// - `Weight`: weight of an edge
+	/// - `DIRESPECT`: whether the directionality of edges is respected
+	///
+	/// Arguments:
+	/// - `n1`: nodes of the first region
+	/// - `n2`: nodes of the second region
+	/// - `weight`: filtering weight function - returns the weight of the edge, iff it can be traversed
+	///
+	/// Returns: nodes `n1` and `n2` in the 1st and 2nd regions resp and the edges path from `n1` to `n2`, if such exists
 	pub fn pathfind_regions<Weight, FW, const DIRESPECT: bool>(&self, n1: &HashSet<NId>, n2: &HashSet<NId>, weight: FW) -> Option<(NId, NId, Vec<&E>)>
 	where
 		Weight: Clone + Copy + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
@@ -195,7 +269,19 @@ where
 		}
 		None
 	}
-	/// Find a cycle over vertex
+	/// Find a (non-trivial) cycle over vertex
+	///
+	/// Currently uses heap-based DFS (and i don't know why, it works tho).
+	///
+	/// Type Parameters:
+	/// - `Weight`: weight of an edge
+	/// - `DIRESPECT`: whether the directionality of edges is respected
+	///
+	/// Arguments:
+	/// - `n`: node id
+	/// - `weight`: filtering weight function - returns the weight of the edge, iff it can be traversed
+	///
+	/// Returns: the edges path from `n` to itself, if such exists
 	pub fn cycle_on<Weight, FW, const DIRESPECT: bool>(&self, n: NId, weight: FW) -> Option<Vec<&E>>
 	where
 		E: Eq,
@@ -222,7 +308,16 @@ where
 	}
 	/// Make the graph eulirian by duplicating edges.
 	///
-	/// The only possible reason for failure is when there is a directed edge going nowhere, in which case the offending edge is reurned.
+	/// The only possible reasons for failure (in a mixed graph) when there is a directed edge going nowhere, in which case the offending edge is returned.
+	///
+	/// Type Parameters:
+	/// - `P`: inverse priority for duplication
+	/// - `DIRESPECT`: whether the directionality of edges is respected
+	///
+	/// Arguments:
+	/// - `duped`: whether the given edge was produced as a result of a previous duplication
+	/// - `priority`: filtering (inverse) priority function - returns the (inverse) priority of an edge subject to duplication, if it can be duplicated (⚠ overly eager rejection of duplication may result in _panic_ attacks!)
+	/// - `dupe`: edge duplicator function
 	pub fn eulirianize<P, FS, FP, FD, const DIRESPECT: bool>(&mut self, duped: FS, priority: FP, dupe: FD) -> Result<(), &E>
 	where
 		P: Ord,
@@ -256,8 +351,12 @@ where
 		}
 		Ok(())
 	}
-	/// Converts a path consisting of successive edges to successively visited nodes
-	pub fn path_to_nodes<'a>( path: impl Iterator<Item = &'a E>, n: NId) -> Vec<(NId, Option<&'a E>)> { //TODO this can become a generator one day!
+	/// Converts a path consisting of successive edges to successively visited nodes (with associated edges).
+	///
+	/// Example:
+	/// - for path starting at `a` of edges `[(a;b),(c;b);(c;d)]` - returns `[a,b,c,d]`, or `[(a,_),(b,(a;b)),(c,(c;b)),(d,(c;d))]` with associated edeges.
+	/// - an empty path starting at `a` - returns `[(a,_)]`
+	pub fn path_to_nodes<'a>(path: impl Iterator<Item = &'a E>, n: NId) -> Vec<(NId, Option<&'a E>)> { //TODO this can become a generator one day!
 		let mut vs = vec![(n, None)];
 		for e in path {
 			vs.push((e.other(vs.last().unwrap().0), Some(e)));
@@ -266,12 +365,27 @@ where
 	}
 }
 
+/// Graph construction adapters, for when your ids don't copy
 pub mod adapt {
 	use super::*;
+	/// A Node that has an id associated to it
 	pub trait IdentifiableNode {
+		/// Id type
 		type Id: Clone + Hash + Eq;
+		/// Id of the node
 		fn id(&self) -> &Self::Id;
 	}
+	/// A graph construction (id) adapter, to construct a graph with additional id mapping.
+	///
+	/// For alogrithmic performance reasons, [`Graph`] requires that node ids are [`Copy`].
+	/// However that is not always the case.
+	/// [`GraphAdapter`] hence allows you to construct a graph, by providing a stored "your node id" ↔ "graph node id" mapping.
+	///
+	/// Type Parameters:
+	/// - `NId`: (lightweight) node id, used by the [`Graph`]
+	/// - `E`: edge type
+	/// - `N`: node type, that identifies itself to (heavy) node id
+	/// - `IdAcc`: intermediate accumulator type value useful for [`GraphAdapter::new`]
 	pub struct GraphAdapter<NId, N, E, IdAcc, Gen>
 	where
 		NId: Clone + Copy + Hash + Eq,
@@ -292,6 +406,11 @@ pub mod adapt {
 		IdAcc: Default,
 		Gen: Fn(&N::Id, IdAcc) -> (NId, IdAcc),
 	{
+		/// Construct a new adapter.
+		///
+		/// Arguments:
+		/// - `gen`: lightweight id generator function - given heavy node id and intermediate accumulator value, provide lightweight id and the next accumulator value
+		/// - `acc`: initial intermediate accumulator value
 		pub fn new(acc: IdAcc, gen: Gen) -> Self {
 			Self {
 				graph: Default::default(),
@@ -300,15 +419,19 @@ pub mod adapt {
 				next_id: gen,
 			}
 		}
+		/// Map heavy id to light id
 		pub fn id2nid(&self, n: &N::Id) -> Option<NId> {
 			self.fwd.get(n).map(|nid| *nid)
 		}
+		/// Map light id to node
 		pub fn nid2node(&self, nid: NId) -> Option<&N> {
 			self.graph.get_node(nid)
-		} 
+		}
+		/// Map light id to heavy id
 		pub fn nid2id(&self, nid: NId) -> Option<&N::Id> {
 			self.nid2node(nid).map(|n| n.id())
 		}
+		/// Add a node to the graph, with id mappings
 		pub fn add_node(mut self, n: N) -> Self {
 			let (nid, acc) = (self.next_id)(n.id(), self.last_id);
 			self.last_id = acc;
@@ -316,6 +439,7 @@ pub mod adapt {
 			self.graph.add_node(nid, n);
 			self
 		}
+		/// Add an edge
 		pub fn add_edge(&mut self, e: E) -> &mut Self {
 			self.graph.add_edge(e);
 			self
@@ -323,10 +447,20 @@ pub mod adapt {
 	}
 }
 
+/// Heuristic graph algorithms
 pub mod heuristics {
 	use super::*;
 	
 	/// Solve Positioned Windy Rural Postman
+	///
+	/// Arguments:
+	/// - `DIRESPECT`: respect directionality of edges
+	/// - `g`: eulirian graph
+	/// - `sp`: starting node
+	/// - `alloc`: set of edges that need to be visited
+	/// - `weight`: filtering weight function
+	///
+	/// Returns: the path visiting all allocated edges on success, or the allocated edges that can't be reached otherwise
 	pub fn solve_pwrp<'a, NId, N, E, Weight, FW, const DIRESPECT: bool>(g: &'a Graph<NId, N, E>, sp: NId, mut alloc: HashSet<&'a E>, weight: FW) -> Result<Vec<&'a E>, HashSet<&'a E>>
 	where 
 		NId: Clone + Copy + Hash + Eq,
