@@ -126,7 +126,6 @@ where
 	}
 	/// Adds (or replaces) a node
 	pub fn add_node(&mut self, id: NId, n: N) -> Option<N> {
-		self.edges.entry(id).or_default();
 		self.nodes.insert(id, n)
 	}
 	/// Adds an edge
@@ -354,7 +353,8 @@ where
 	///
 	/// Arguments:
 	/// - `DIRESPECT`: whether the directionality of edges is respected
-	pub fn strongly_connected_components<const DIRESPECT: bool>(&self) -> Vec<HashSet<NId>>
+	/// - `ORPHANS`: whether orphan nodes are included as SCCs
+	pub fn strongly_connected_components<const DIRESPECT: bool, const ORPHANS: bool>(&self) -> Vec<HashSet<NId>>
 	where NId: std::fmt::Display {
 		use std::cmp::min;
 		let mut sccs = Vec::new();
@@ -363,6 +363,9 @@ where
 		let mut inf: HashMap<_, (bool, usize, usize)> = HashMap::new();
 		let mut q = Vec::new();
 		for u in self.nodes.keys().into_iter().cloned() {
+			if self.get_edges(u).len() == 0 && !ORPHANS {
+				continue;
+			}
 			if !inf.contains_key(&u) {
 				q.push((u, self.get_edges(u).iter().collect::<Vec<_>>(), false));
 				// "strongconnect"
@@ -800,10 +803,10 @@ mod test {
 	#[test]
 	fn test_sccs(){
 		let g = graph!(vec![(0, 1)]);
-		assert_eq_unordered!(g.strongly_connected_components::<true>(), vec![vec![0].into_iter().collect(), vec![1].into_iter().collect()]);
-		assert_eq_unordered!(g.strongly_connected_components::<false>(), vec![vec![0, 1].into_iter().collect()]);
+		assert_eq_unordered!(g.strongly_connected_components::<true, false>(), vec![vec![0].into_iter().collect(), vec![1].into_iter().collect()]);
+		assert_eq_unordered!(g.strongly_connected_components::<false, false>(), vec![vec![0, 1].into_iter().collect()]);
 		let g = graph!(vec![(0, 1), (1, 2), (2, 0), (3, 1), (3, 2), (4, 5), (5, 4)]);
-		assert_eq_unordered!(g.strongly_connected_components::<true>(), vec![vec![0, 1, 2].into_iter().collect(), vec![3].into_iter().collect(), vec![4, 5].into_iter().collect()]);
-		assert_eq_unordered!(g.strongly_connected_components::<false>(), vec![vec![0, 1, 2, 3].into_iter().collect(), vec![4, 5].into_iter().collect()]);
+		assert_eq_unordered!(g.strongly_connected_components::<true, false>(), vec![vec![0, 1, 2].into_iter().collect(), vec![3].into_iter().collect(), vec![4, 5].into_iter().collect()]);
+		assert_eq_unordered!(g.strongly_connected_components::<false, false>(), vec![vec![0, 1, 2, 3].into_iter().collect(), vec![4, 5].into_iter().collect()]);
 	}
 }
