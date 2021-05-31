@@ -647,7 +647,7 @@ pub mod sidewalk {
 		Ok(solution.into_iter().zip(sns.into_iter()).map(|(path, n)| Graph::<SID, RoadNode, RoadEdge>::path_to_nodes(path.into_iter(), n).into_iter().map(|(u, e)| data::SidewalkPathSegment {
 			node: g.graph.nid2id(u).unwrap().clone(),
 			discriminator: e.and_then(|e| e.discriminator).map(|d| g.graph.nid2id(d).unwrap().clone()),
-			side: e.unwrap().side.into(),
+			side: e.and_then(|e| e.side.into()),
 		}).collect()).collect())
 	}
 }
