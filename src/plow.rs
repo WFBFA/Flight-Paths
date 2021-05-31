@@ -445,7 +445,7 @@ pub mod road {
 {:?}
 (^nodes in each region^)
 Only the largest region will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
-				g.graph.graph.retain_nodes(|n| sccs[0].contains(&n));
+				g.graph.graph.retain_nodes_edges(|n| sccs[0].contains(&n));
 			} else {
 				log::debug!("Damn, what a clean road graph you go there!");
 			}

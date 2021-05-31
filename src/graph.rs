@@ -155,6 +155,10 @@ where
 	/// Retains only the nodes (and edges) matching the predicate
 	pub fn retain_nodes(&mut self, f: impl Fn(NId) -> bool){
 		self.nodes.retain(|n, _| f(*n));
+		self.retain_nodes_edges(f);
+	}
+	/// Retains only the edges of nodes matching the predicate
+	pub fn retain_nodes_edges(&mut self, f: impl Fn(NId) -> bool){
 		self.edges.retain(|n, _| f(*n));
 		for (u, es) in &mut self.edges {
 			es.retain(|e| f(e.other(*u)));
