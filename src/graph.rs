@@ -96,6 +96,10 @@ where
 	pub fn get_edges(&self, n: NId) -> &HashSet<E> {
 		self.edges.get(&n).unwrap_or(&self._empty)
 	}
+	/// Whether the given node has no edges
+	pub fn is_orphan(&self, n: NId) -> bool {
+		self.get_edges(n).is_empty()
+	}
 	/// Get all edges between 2 nodes
 	pub fn get_edges_between(&self, n1: NId, n2: NId) -> Vec<&E> {
 		self.edges.get(&n1).iter().flat_map(|es| es.iter()).filter(|e| e.other(n1) == n2).collect()
@@ -367,7 +371,7 @@ where
 		let mut inf: HashMap<_, (bool, usize, usize)> = HashMap::new();
 		let mut q = Vec::new();
 		for u in self.nodes.keys().into_iter().cloned() {
-			if self.get_edges(u).len() == 0 && !ORPHANS {
+			if self.is_orphan(u) && !ORPHANS {
 				continue;
 			}
 			if !inf.contains_key(&u) {

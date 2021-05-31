@@ -269,6 +269,28 @@ mod common {
 	}
 
 	#[macro_export]
+	macro_rules! locate {
+		($locs:expr, $g:expr, $v:expr) => {
+			{
+				let sns: Vec<_> = $locs.iter().try_map_all(|l| match l {
+					data::Location::Node(n) => {
+						let nid = $g.graph.id2nid(n).ok_or_else(|| format!("Couldn't find node {}", n))?;
+						if !$g.graph.graph.is_orphan(nid) {
+							Ok(nid)
+						} else {
+							Err(format!("Explicitly specified node {} is an orphan", nid))
+						}
+					},
+					data::Location::Coordinates(lon, lat) => $g.graph.graph.nodes().filter(|(n, _)| !$g.graph.graph.is_orphan(*n)).min_by_key(|(_, n)| n64((*lon, *lat).distance(&n.pos()))).map(|(n, _)| n).ok_or_else(|| format!("failed to locate ({},{}) to graph", lon, lat))
+				})?.collect();
+				log::info!("Located {}", $v);
+				log::debug!("{:?}", sns.iter().cloned().map(|n| $g.graph.nid2id(n).unwrap()).collect::<Vec<_>>());
+				sns
+			}
+		}
+	}
+
+	#[macro_export]
 	macro_rules! fix_sccs {
 		($g:expr, $sns:expr, $v:expr) => {
 			{
@@ -376,9 +398,6 @@ pub mod fly {
 
 	/// Solves the pathing problem for brrr drones
 	pub fn solve(roads: data::RoadGraph, drones: data::Drones, params: &Parameters) -> Result<data::Paths, String> {
-		let sns: Vec<NodeId> = drones.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to locate {:?}", l)))?.collect();
-		log::info!("Located drones");
-		log::debug!("{:?}", sns);
 		let mut g: PlowSolver<RoadNode, RoadEdge, _> = plow_solver!();
 		for n in roads.nodes.nodes {
 			g.graph = g.graph.add_node(n.into());
@@ -392,7 +411,7 @@ pub mod fly {
 				iidx: 0
 			});
 		}
-		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
+		let sns = locate!(drones, g, "drones");
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
 		fix_sccs!(g, sns, "drones");
 		log::debug!("Constructed graph with {} nodes, {} segments and {} drones", g.graph.graph.node_count(), g.graph.graph.edge_count(), sns.len());
@@ -466,9 +485,6 @@ pub mod road {
 	///
 	/// Except it also converts all the data both ways and does other safety checks.
 	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: &Parameters) -> Result<data::Paths, String> {
-		let sns: Vec<NodeId> = vehicles.road.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to located {:?}", l)))?.collect();
-		log::info!("Located vehicles");
-		log::debug!("{:?}", sns);
 		let mut g: PlowSolver<RoadNode, RoadEdge, _> = plow_solver!();
 		for n in roads.nodes.nodes {
 			g.graph = g.graph.add_node(n.into());
@@ -483,9 +499,7 @@ pub mod road {
 				iidx: 0
 			});
 		}
-		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
-		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
-		fix_sccs!(g, sns, "vehicles", |e| RoadEdge { directed: false, ..e });
+		let sns = locate!(vehicles.sidewalk, g, "vehicles");
 		g.graph.graph.eulirianize::<_, _, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe, |e| RoadEdge { directed: false, ..e }).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
@@ -592,9 +606,6 @@ pub mod sidewalk {
 	///
 	/// Except it also converts all the data both ways and does other safety checks.
 	pub fn solve(roads: data::RoadGraph, snow: data::SnowStatuses, snow_d: Option<f64>, vehicles: data::VehiclesConfiguration, params: &Parameters) -> Result<data::SidewalkPaths, String> {
-		let sns: Vec<NodeId> = vehicles.sidewalk.iter().try_map_all(|l| roads.nodes.locate(l).ok_or_else(|| format!("Failed to located {:?}", l)))?.collect();
-		log::info!("Located vehicles");
-		log::debug!("{:?}", sns);
 		let mut g: PlowSolver<RoadNode, RoadEdge, _> = plow_solver!();
 		for n in roads.nodes.nodes {
 			g.graph = g.graph.add_node(n.into());
@@ -620,7 +631,7 @@ pub mod sidewalk {
 				g.graph.add_edge(edge!(SidewalkSide::Right));
 			}
 		}
-		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
+		let sns = locate!(vehicles.sidewalk, g, "vehicles");
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
 		fix_sccs!(g, sns, "vehicles", |e| RoadEdge { side: SidewalkSide::Wroom, ..e });
 		g.graph.graph.eulirianize::<_, _, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe, |e| RoadEdge { side: SidewalkSide::Wroom, ..e }).unwrap();
