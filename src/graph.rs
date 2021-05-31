@@ -177,6 +177,27 @@ where
 		let d = self.degree::<DIRESPECT>(n);
 		d % 2 == 0 && (!DIRESPECT || d >= 0)
 	}
+	/// Find all edges going from one region to another
+	///
+	/// Arguments:
+	/// - `DIRESPECT`: whether the directionality of edges is respected
+	/// - `n1`: nodes of the first region
+	/// - `n2`: nodes of the second region
+	///
+	/// Returns: nodes `n1` and `n2` in the 1st and 2nd regions resp and the edge from `n1` to `n2`
+	pub fn get_edges_between_regions<const DIRESPECT: bool>(&self, n1: &HashSet<NId>, n2: &HashSet<NId>) -> Vec<(NId, NId, &E)> {
+		let mut es = Vec::new();
+		for n1 in n1.iter().cloned() {
+			for n2 in n2.iter().cloned() {
+				for e in self.get_edges_between(n1, n2) {
+					if e.is_outgoing::<DIRESPECT>(n1) && e.is_incoming::<DIRESPECT>(n2) {
+						es.push((n1, n2, e));
+					}
+				}
+			}
+		}
+		es
+	}
 	/// Find shortest path between 2 points, edge-weighted by a function
 	///
 	/// Currently uses heap-optimized Dijkstra's shortest path algorithm.
@@ -412,6 +433,37 @@ where
 					let e = es.iter().next().unwrap();
 					if e.directed() {
 						redir.insert(e.clone());
+					}
+				}
+			}
+			for e in &redir {
+				self.remove_edge(e);
+			}
+			for e in redir.into_iter().map(dedirect) {
+				self.add_edge(e);
+			}
+		}
+	}
+	/// Patches weak links between regions
+	///
+	/// _SCCs together stronk!_
+	///
+	/// Arguments:
+	/// - `DIRESPECT`: whether the directionality of edges is respected (weakly linked SCCs can only exist in mixed graphs, calling this without respect is no-op)
+	/// - `regions`: regions between which to patch weak links, assumed SCCs
+	/// - `dedirect`: function that transforms a directed edge into an undirected one, preserving all other properties (the function is always and only fed directed edges)
+	pub fn patch_sccs<FD, const DIRESPECT: bool>(&mut self, regions: &Vec<HashSet<NId>>, dedirect: FD)
+	where
+		FD: Fn(E) -> E,
+	{
+		if DIRESPECT {
+			let mut redir = HashSet::new();
+			for i in 0..regions.len() {
+				for j in (i+1)..regions.len() {
+					for (.., e) in self.get_edges_between_regions::<DIRESPECT>(&regions[i], &regions[j]) {
+						if e.directed() && !redir.contains(e) {
+							redir.insert(e.clone());
+						}
 					}
 				}
 			}
