@@ -153,7 +153,7 @@ where
 						}
 						sol_next[i] = sol;
 					}
-					Err(_es) => panic!("Can't reach everywhere :( {}", _es.into_iter().map(|e| format!("{:?} ({}<->{})", e, self.graph.nid2id(e.p1()).unwrap(), self.graph.nid2id(e.p2()).unwrap())).join(", ")) //TODO instead of panicking, try to reallocate unreachable sections first
+					Err(_es) => panic!("Can't reach everywhere :( ({}) {}", _es.len(), _es.into_iter().take(50).map(|e| format!("{:?} ({}<->{})", e, self.graph.nid2id(e.p1()).unwrap(), self.graph.nid2id(e.p2()).unwrap())).join(", ")) //TODO instead of panicking, try to reallocate unreachable sections first
 				}
 			}
 			//Evaluate
