@@ -455,12 +455,12 @@ Only the largest region will be considered!"#, sccs.iter().map(HashSet::len).col
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
 			g.graph.graph.edges().collect()
 		} else {
-			snow.into_iter().filter(|s| s.depth > 0.0).try_map_all(|s| {
-				let p1 = g.graph.id2nid(&s.p1).ok_or_else(|| format!("Snow status node {} not found", s.p1))?;
-				let p2 = g.graph.id2nid(&s.p2).ok_or_else(|| format!("Snow status node {} not found", s.p2))?;
+			snow.into_iter().filter(|s| s.depth > 0.0).filter_map(|s| {
+				let p1 = g.graph.id2nid(&s.p1)?;
+				let p2 = g.graph.id2nid(&s.p2)?;
 				let discr = s.discriminator.map(|d| g.graph.id2nid(&d).unwrap());
-				g.graph.graph.get_edges_between(p1, p2).into_iter().find(|e| e.discriminator == discr && e.iidx == 0).ok_or_else(|| format!("Snow status edge not found"))
-			})?.collect()
+				g.graph.graph.get_edges_between(p1, p2).into_iter().find(|e| e.discriminator == discr && e.iidx == 0)
+			}).collect()
 		};
 		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
 		let solution = g.solve::<true>(&sns, &locations, &snowy, params);
