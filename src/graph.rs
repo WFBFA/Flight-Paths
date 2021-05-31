@@ -731,27 +731,24 @@ pub mod heuristics {
 				}
 			} else {
 				log::trace!("connecting to a distant isle");
-				let vs: HashSet<_> = alloc.iter().flat_map(|e| if !DIRESPECT || !e.directed() { vec![e.p1(), e.p2()] } else { vec![e.p1()] }).collect();
-				let us: IndexMap<_, _> = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().filter_map(|(i, (u, _))| {
-					let ures: Vec<_> = g.get_edges(u).iter().filter(|e| !sol.contains(e)).collect();
-					if ures.iter().filter(|e| e.is_incoming::<DIRESPECT>(u)).count() > 0 && ures.iter().filter(|e| e.is_outgoing::<DIRESPECT>(u)).count() > 0 {
-						Some((u, i))
+				let mut vs: HashSet<_> = alloc.iter().flat_map(|e| if !DIRESPECT || !e.directed() { vec![e.p1(), e.p2()] } else { vec![e.p1()] }).collect();
+				let us: IndexMap<_, _> = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().map(|(i, (u, _))| (u, i)).collect();
+				if let Some((inj, y)) = loop {
+					if let Some((u, v, mut p)) = g.pathfind_regions::<_, _, DIRESPECT>(&us.keys().cloned().collect(), &vs, |e| weight(e)) {
+						if let Some((e, mut pb)) = g.get_edges(v).iter().find_map(|e| if e.is_outgoing::<DIRESPECT>(v) && alloc.contains(e) && !sol.contains(&e) {
+							g.pathfind::<_, _, DIRESPECT>(e.other(v), u, |e| weight(e)).map(|path| (e, path))
+						} else { None }) {
+							p.push(e);
+							p.append(&mut pb);
+							// log::trace!("connecting {} to {} to {} to {}", u, v, e.other(v), u);
+							break Some((p, *us.get(&u).unwrap()));
+						} else {
+							log::trace!("Can go from u to v, but not back; discarding v");
+							vs.remove(&v);
+						}
 					} else {
-						None
+						break None;
 					}
-				}).collect();
-				if let Some((inj, y)) = if let Some((u, v, mut p)) = g.pathfind_regions::<_, _, DIRESPECT>(&us.keys().cloned().collect(), &vs, |e| weight(e)) {
-					let e = alloc.iter().find(|e| !sol.contains(e) && e.is_outgoing::<DIRESPECT>(v)).unwrap();
-					p.push(*e);
-					if let Some(mut pb) = g.pathfind::<_, _, DIRESPECT>(e.other(v), u, |e| if !p.contains(&e) { weight(e) } else { None }) {
-						p.append(&mut pb);
-						// log::trace!("connecting {} to {} to {} to {}", u, v, e.other(v), u);
-						Some((p, *us.get(&u).unwrap()))
-					} else {
-						None
-					}
-				} else {
-					None
 				} {
 					sol_inject!(inj, y);
 				} else {
