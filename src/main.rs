@@ -140,7 +140,6 @@ fn main() -> std::io::Result<()> {
 		let roads: data::RoadGraph = serde_json::from_reader(&std::fs::File::open(matches.value_of("road-graph").unwrap())?).expect("Road graph invalid JSON");
 		let params: meta::Parameters = serde_yaml::from_reader(&std::fs::File::open(matches.value_of("meta").unwrap())?).expect("Meta parameters invalid JSON");
 		log::info!("Loaded configuration");
-		// let paths = brr::construct_flight_paths(roads, &drones).unwrap();
 		let paths = plow::fly::solve(roads, drones, &params).unwrap();
 		log::info!("Constructed paths");
 		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &paths).unwrap();
