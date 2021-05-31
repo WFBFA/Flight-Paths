@@ -351,16 +351,15 @@ pub mod fly {
 		p2: SID,
 		discriminator: Option<SID>,
 		length: N64,
-		iidx: u64,
 	}
 	impl PartialEq<RoadEdge> for RoadEdge {
 		fn eq(&self, other: &Self) -> bool {
-			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx == other.iidx
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator
 		}
 	}
 	impl std::hash::Hash for RoadEdge {
 		fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
-			(self.p1, self.p2, self.discriminator, self.iidx).hash(h)
+			(self.p1, self.p2, self.discriminator).hash(h)
 		}
 	}
 	impl Weighted for RoadEdge {
@@ -379,20 +378,6 @@ pub mod fly {
 			false
 		}
 	}
-	impl RoadEdge {
-		fn duped(&self, other: &Self) -> bool {
-			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx != other.iidx
-		}
-		fn dupe(&self) -> Self {
-			Self {
-				p1: self.p1,
-				p2: self.p2,
-				discriminator: self.discriminator,
-				length: self.length,
-				iidx: self.iidx + 1,
-			}
-		}
-	}
 
 	/// Solves the pathing problem for brrr drones
 	pub fn solve(roads: data::RoadGraph, drones: data::Drones, params: &Parameters) -> Result<data::Paths, String> {
@@ -406,7 +391,6 @@ pub mod fly {
 				p2: g.graph.id2nid(&e.p2).unwrap(),
 				discriminator: e.discriminator.map(|id| g.graph.id2nid(&id).unwrap()),
 				length: e.distance,
-				iidx: 0
 			});
 		}
 		let sns = locate!(drones, g, "drones");
@@ -433,16 +417,15 @@ pub mod road {
 		discriminator: Option<SID>,
 		directed: bool,
 		length: N64,
-		iidx: u64,
 	}
 	impl PartialEq<RoadEdge> for RoadEdge {
 		fn eq(&self, other: &Self) -> bool {
-			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx == other.iidx
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator
 		}
 	}
 	impl std::hash::Hash for RoadEdge {
 		fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
-			(self.p1, self.p2, self.discriminator, self.iidx).hash(h)
+			(self.p1, self.p2, self.discriminator).hash(h)
 		}
 	}
 	impl Weighted for RoadEdge {
@@ -461,21 +444,6 @@ pub mod road {
 			self.directed
 		}
 	}
-	impl RoadEdge {
-		fn duped(&self, other: &Self) -> bool {
-			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.iidx != other.iidx
-		}
-		fn dupe(&self) -> Self {
-			Self {
-				p1: self.p1,
-				p2: self.p2,
-				discriminator: self.discriminator,
-				directed: self.directed,
-				length: self.length,
-				iidx: self.iidx + 1,
-			}
-		}
-	}
 
 	/// Solves the snow plowing problem for roads.
 	///
@@ -492,7 +460,6 @@ pub mod road {
 				discriminator: e.discriminator.map(|id| g.graph.id2nid(&id).unwrap()),
 				directed: e.directed,
 				length: e.distance,
-				iidx: 0
 			});
 		}
 		let sns = locate!(vehicles.sidewalk, g, "vehicles");
@@ -500,13 +467,13 @@ pub mod road {
 		fix_sccs!(g, sns, "vehicles", |e| RoadEdge { directed: false, ..e });
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
-			g.graph.graph.edges().filter(|e| e.iidx == 0).collect()
+			g.graph.graph.edges().collect()
 		} else {
 			snow.into_iter().filter(|s| s.depth > 0.0).filter_map(|s| {
 				let p1 = g.graph.id2nid(&s.p1)?;
 				let p2 = g.graph.id2nid(&s.p2)?;
 				let discr = s.discriminator.map(|d| g.graph.id2nid(&d).unwrap());
-				g.graph.graph.get_edges_between(p1, p2).into_iter().find(|e| e.discriminator == discr && e.iidx == 0)
+				g.graph.graph.get_edges_between(p1, p2).into_iter().find(|e| e.discriminator == discr)
 			}).collect()
 		};
 		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
@@ -555,16 +522,15 @@ pub mod sidewalk {
 		discriminator: Option<SID>,
 		side: SidewalkSide,
 		length: N64,
-		iidx: u64,
 	}
 	impl PartialEq<RoadEdge> for RoadEdge {
 		fn eq(&self, other: &Self) -> bool {
-			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.side == other.side && self.iidx == other.iidx
+			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.side == other.side
 		}
 	}
 	impl std::hash::Hash for RoadEdge {
 		fn hash<H: std::hash::Hasher>(&self, h: &mut H) {
-			(self.p1, self.p2, self.discriminator, self.side, self.iidx).hash(h)
+			(self.p1, self.p2, self.discriminator, self.side).hash(h)
 		}
 	}
 	impl Weighted for RoadEdge {
@@ -581,21 +547,6 @@ pub mod sidewalk {
 		}
 		fn directed(&self) -> bool {
 			self.side == SidewalkSide::WroomOneWay
-		}
-	}
-	impl RoadEdge {
-		fn duped(&self, other: &Self) -> bool {
-			self.p1 == other.p1 && self.p2 == other.p2 && self.discriminator == other.discriminator && self.side == other.side && self.iidx != other.iidx
-		}
-		fn dupe(&self) -> Self {
-			Self {
-				p1: self.p1,
-				p2: self.p2,
-				discriminator: self.discriminator,
-				side: self.side,
-				length: self.length,
-				iidx: self.iidx + 1,
-			}
 		}
 	}
 
@@ -616,7 +567,6 @@ pub mod sidewalk {
 						discriminator: e.discriminator.as_ref().map(|id| g.graph.id2nid(id).unwrap()),
 						side: $side,
 						length: e.distance,
-						iidx: 0
 					}
 				}
 			}
@@ -633,13 +583,13 @@ pub mod sidewalk {
 		fix_sccs!(g, sns, "vehicles", |e| RoadEdge { side: SidewalkSide::Wroom, ..e });
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every sidewalk counts!", _snow_d);
-			g.graph.graph.edges().filter(|e| e.side.is_sidewalk() && e.iidx == 0).collect()
+			g.graph.graph.edges().filter(|e| e.side.is_sidewalk()).collect()
 		} else {
 			snow.into_iter().filter(|s| s.depth > 0.0).filter_map(|s| {
 				let p1 = g.graph.id2nid(&s.p1)?;
 				let p2 = g.graph.id2nid(&s.p2)?;
 				let discr = s.discriminator.map(|d| g.graph.id2nid(&d).unwrap());
-				Some(g.graph.graph.get_edges_between(p1, p2).into_iter().filter(|e| e.discriminator == discr && e.side.is_sidewalk() && e.iidx == 0).collect::<Vec<_>>())
+				Some(g.graph.graph.get_edges_between(p1, p2).into_iter().filter(|e| e.discriminator == discr && e.side.is_sidewalk()).collect::<Vec<_>>())
 			}).flatten().collect()
 		};
 		log::debug!("Constructed graph with {} nodes, {}/{} snowed segments and {} vehicles", g.graph.graph.node_count(), snowy.len(), g.graph.graph.edge_count(), sns.len());
