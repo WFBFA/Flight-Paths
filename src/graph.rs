@@ -731,10 +731,10 @@ pub mod heuristics {
 						None
 					}
 				}).collect();
-				if let Some((inj, y)) = if let Some((u, v, mut p)) = g.pathfind_regions::<_, _, DIRESPECT>(&us.keys().cloned().collect(), &vs, sol_weight!()) {
+				if let Some((inj, y)) = if let Some((u, v, mut p)) = g.pathfind_regions::<_, _, DIRESPECT>(&us.keys().cloned().collect(), &vs, |e| weight(e)) {
 					let e = alloc.iter().find(|e| e.is_outgoing::<DIRESPECT>(v)).unwrap();
 					p.push(*e);
-					if let Some(mut pb) = g.pathfind::<_, _, DIRESPECT>(e.other(v), u, |e| if !sol.contains(&e) && !p.contains(&e) { weight(e) } else { None }) {
+					if let Some(mut pb) = g.pathfind::<_, _, DIRESPECT>(e.other(v), u, |e| if !p.contains(&e) { weight(e) } else { None }) {
 						p.append(&mut pb);
 						// log::trace!("connecting {} to {} to {} to {}", u, v, e.other(v), u);
 						Some((p, *us.get(&u).unwrap()))
