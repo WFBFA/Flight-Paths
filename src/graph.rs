@@ -716,10 +716,15 @@ pub mod heuristics {
 			}
 		}
 		while !alloc.is_empty() {
-			if let Some((v, y)) = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().find_map(|(i, (v, _))| if g.get_edges(v).iter().any(|e| !sol.contains(&e) && alloc.contains(e)) { Some((v, i)) } else { None }) {
+			if let Some((u, y, e)) = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().find_map(|(i, (u, _))| if let Some(e) = g.get_edges(u).iter().find(|e| e.is_outgoing::<DIRESPECT>(u) && !sol.contains(&e) && alloc.contains(e)) { Some((u, i, e)) } else { None }) {
 				log::trace!("injecting a cycle");
-				let inj = g.cycle_on::<_, _, DIRESPECT>(v, sol_weight!()).unwrap();
-				sol_inject!(inj, y);
+				let v = e.other(u);
+				if let Some(mut p) = g.pathfind::<_, _, DIRESPECT>(v, u, |e| weight(e)) {
+					p.insert(0, e);
+					sol_inject!(p, y);
+				} else {
+					panic!("it's a trap!");
+				}
 			} else {
 				log::trace!("connecting to a distant isle");
 				let vs: HashSet<_> = alloc.iter().flat_map(|e| if !DIRESPECT || !e.directed() { vec![e.p1(), e.p2()] } else { vec![e.p1()] }).collect();
@@ -732,7 +737,7 @@ pub mod heuristics {
 					}
 				}).collect();
 				if let Some((inj, y)) = if let Some((u, v, mut p)) = g.pathfind_regions::<_, _, DIRESPECT>(&us.keys().cloned().collect(), &vs, |e| weight(e)) {
-					let e = alloc.iter().find(|e| e.is_outgoing::<DIRESPECT>(v)).unwrap();
+					let e = alloc.iter().find(|e| !sol.contains(e) && e.is_outgoing::<DIRESPECT>(v)).unwrap();
 					p.push(*e);
 					if let Some(mut pb) = g.pathfind::<_, _, DIRESPECT>(e.other(v), u, |e| if !p.contains(&e) { weight(e) } else { None }) {
 						p.append(&mut pb);
