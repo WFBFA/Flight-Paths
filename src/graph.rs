@@ -153,6 +153,14 @@ where
 			false
 		}
 	}
+	/// Retains only the nodes (and edges) matching the predicate
+	pub fn retain_nodes(&mut self, f: impl Fn(NId) -> bool){
+		self.nodes.retain(|n, _| f(*n));
+		self.edges.retain(|n, _| f(*n));
+		for (u, es) in &mut self.edges {
+			es.retain(|e| f(e.other(*u)));
+		}
+	}
 	/// Calculate combined degree of a vertex
 	///
 	/// - For an undirected graph, combined degree is "simply" degree - aka number of edges at the vertex.
