@@ -500,6 +500,7 @@ pub mod road {
 			});
 		}
 		let sns = locate!(vehicles.sidewalk, g, "vehicles");
+		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
 		g.graph.graph.eulirianize::<_, _, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe, |e| RoadEdge { directed: false, ..e }).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
