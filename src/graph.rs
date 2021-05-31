@@ -498,12 +498,14 @@ where
 	/// - `duped`: whether the given edge was produced as a result of a previous duplication
 	/// - `priority`: filtering (inverse) priority function - returns the (inverse) priority of an edge subject to duplication, if it can be duplicated (⚠ overly eager rejection of duplication may result in _panic_ attacks!)
 	/// - `dupe`: edge duplicator function
-	pub fn eulirianize<P, FS, FP, FD, const DIRESPECT: bool>(&mut self, duped: FS, priority: FP, dupe: FD) -> Result<(), &E>
+	/// - `dedirect`: function that transforms a directed edge into an undirected one, preserving all other properties (the function is always and only fed directed edges)
+	pub fn eulirianize<P, FS, FP, FD, FU, const DIRESPECT: bool>(&mut self, duped: FS, priority: FP, dupe: FD, dedirect: FU) -> Result<(), &E>
 	where
 		P: Ord,
 		FS: Fn(&E, &E) -> bool,
 		FP: Fn(&E) -> Option<P>,
 		FD: Fn(&E) -> E,
+		FU: Fn(E) -> E,
 	{
 		let es0 = self.edge_count();
 		log::trace!("Eulirianizing {} edges", es0);
@@ -519,7 +521,7 @@ where
 		}
 		let es1 = self.edge_count();
 		log::trace!("duped {} singular edges -> {}", es1-es0, es1);
-		if DIRESPECT {
+		/*if DIRESPECT {
 			use std::cmp::max;
 			let mut esd: HashMap<_, usize> = HashMap::new();
 			for (u, es) in &self.edges {
@@ -546,11 +548,11 @@ where
 			for e in add {
 				self.add_edge(e);
 			}
-		} else {
-			while let Some((u, es)) = self.edges.iter().find(|(u, es)| !self.eulirian_compatible::<DIRESPECT>(**u) && es.iter().any(|e| !e.directed())) {
+		} else {*/
+			while let Some((u, es)) = self.edges.iter().find(|(u, es)| !self.eulirian_compatible::<DIRESPECT>(**u)) {
 				let u = *u;
 				let epre = es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some());
-				let mut es: Vec<_> = if DIRESPECT {
+				let mut ess: Vec<_> = if DIRESPECT {
 					let ind = es.iter().filter(|e| e.directed() && e.p2() == u).count();
 					let outd = es.iter().filter(|e| e.directed() && e.p1() == u).count();
 					epre.filter(|e| !e.directed() || (outd > ind && e.p2() == u) || (ind > outd && e.p1() == u)).collect()
@@ -558,10 +560,23 @@ where
 					epre.collect()
 				};
 				//TODO Better sorting heurisitic when directionality is respected 
-				es.sort_unstable_by_key(|e| (-((self.get_edges(e.p1()).len()%2+self.get_edges(e.p2()).len()%2) as isize), priority(e).unwrap()));
-				self.add_edge(dupe(es[0]));
+				ess.sort_unstable_by_key(|e| (-((self.get_edges(e.p1()).len()%2+self.get_edges(e.p2()).len()%2) as isize), priority(e).unwrap()));
+				if let Some(e) = ess.first() {
+					self.add_edge(dupe(e));
+				} else if DIRESPECT {
+					log::warn!("Found an odd node (d{}), dedirecting all edges", self.degree::<DIRESPECT>(u)); //FIXME sometimes it's reasonable, sometimes something is off
+					let es: Vec<_> = es.iter().filter(|e| !e.is_cyclic() && !es.iter().any(|ee| duped(e, ee)) && priority(e).is_some()).cloned().collect();
+					for e in &es {
+						self.remove_edge(e);
+					}
+					for e in es.into_iter().map(|e| dedirect(e)) {
+						self.add_edge(e);
+					}
+				} else {
+					panic!("unreachable!");
+				}
 			}
-		}
+		//}
 		let es2 = self.edge_count();
 		log::trace!("duped {} additional edges -> {}", es2-es1, es2);
 		Ok(())
