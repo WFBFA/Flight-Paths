@@ -720,7 +720,7 @@ pub mod heuristics {
 			}
 		}
 		while !alloc.is_empty() {
-			if let Some((u, y, e)) = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().find_map(|(i, (u, _))| if let Some(e) = g.get_edges(u).iter().find(|e| e.is_outgoing::<DIRESPECT>(u) && !sol.contains(&e) && alloc.contains(e)) { Some((u, i, e)) } else { None }) {
+			if let Some((u, y, e)) = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().find_map(|(i, (u, _))| if let Some(e) = g.get_edges(u).iter().find(|e| e.is_outgoing::<DIRESPECT>(u) && alloc.contains(e)) { Some((u, i, e)) } else { None }) {
 				log::trace!("injecting a cycle");
 				let v = e.other(u);
 				if let Some(mut p) = g.pathfind::<_, _, DIRESPECT>(v, u, |e| weight(e)) {
@@ -735,7 +735,7 @@ pub mod heuristics {
 				let us: IndexMap<_, _> = Graph::<NId, N, E>::path_to_nodes(sol.iter().map(|e| *e), sp).into_iter().enumerate().map(|(i, (u, _))| (u, i)).collect();
 				if let Some((inj, y)) = loop {
 					if let Some((u, v, mut p)) = g.pathfind_regions::<_, _, DIRESPECT>(&us.keys().cloned().collect(), &vs, |e| weight(e)) {
-						if let Some((e, mut pb)) = g.get_edges(v).iter().find_map(|e| if e.is_outgoing::<DIRESPECT>(v) && alloc.contains(e) && !sol.contains(&e) {
+						if let Some((e, mut pb)) = g.get_edges(v).iter().find_map(|e| if e.is_outgoing::<DIRESPECT>(v) && alloc.contains(e) {
 							g.pathfind::<_, _, DIRESPECT>(e.other(v), u, |e| weight(e)).map(|path| (e, path))
 						} else { None }) {
 							p.push(e);
