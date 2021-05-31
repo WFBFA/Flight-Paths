@@ -453,7 +453,7 @@ Only the largest region will be considered!"#, sccs.iter().map(HashSet::len).col
 		g.graph.graph.eulirianize::<_, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
-			g.graph.graph.edges().collect()
+			g.graph.graph.edges().filter(|e| e.iidx == 0).collect()
 		} else {
 			snow.into_iter().filter(|s| s.depth > 0.0).filter_map(|s| {
 				let p1 = g.graph.id2nid(&s.p1)?;
