@@ -267,6 +267,57 @@ mod common {
 			}
 		}
 	}
+
+	#[macro_export]
+	macro_rules! fix_sccs {
+		($g:expr, $sns:expr, $v:expr) => {
+			{
+				let mut sccs = $g.graph.graph.strongly_connected_components::<false, false>();
+				log::debug!("Undirected sccs: {}", sccs.len());
+				if sccs.len() > 1 {
+					sccs.sort_unstable_by_key(|s| -(s.len() as isize));
+					log::warn!(r#"Road graph contains multiple disconnected regions:
+{:?}
+(^nodes in each region^)
+Only the regions with {} will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>(), $v);
+					let mut reachable = HashSet::new();
+					for scc in sccs {
+						if $sns.iter().any(|s| scc.contains(s)) {
+							reachable.extend(scc);
+						}
+					}
+					$g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
+				} else {
+					log::debug!("Damn, what a clean road graph you go there!");
+				}
+			}
+		};
+		($g:expr, $sns:expr, $v:expr, $dedir:expr) => {
+			{
+				let sccs = $g.graph.graph.strongly_connected_components::<true, false>();
+				log::debug!("Directed sccs: {}", sccs.len());
+				$g.graph.graph.patch_sccs::<_, true>(&sccs, $dedir);
+				let mut sccs = $g.graph.graph.strongly_connected_components::<false, false>();
+				log::debug!("Undirected sccs after patch: {}", sccs.len());
+				if sccs.len() > 1 {
+					sccs.sort_unstable_by_key(|s| -(s.len() as isize));
+					log::warn!(r#"Road graph contains multiple disconnected regions:
+{:?}
+(^nodes in each region^)
+Only the regions with {} will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>(), $v);
+					let mut reachable = HashSet::new();
+					for scc in sccs {
+						if $sns.iter().any(|s| scc.contains(s)) {
+							reachable.extend(scc);
+						}
+					}
+					$g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
+				} else {
+					log::debug!("Damn, what a clean road graph you go there!");
+				}
+			}
+		};
+	}
 }
 
 /// Specialization for solving flying surveing paths
@@ -343,26 +394,7 @@ pub mod fly {
 		}
 		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
-		{
-			let mut sccs = g.graph.graph.strongly_connected_components::<false, false>();
-			log::debug!("Undirected sccs: {}", sccs.len());
-			if sccs.len() > 1 {
-				sccs.sort_unstable_by_key(|s| -(s.len() as isize));
-				log::warn!(r#"Road graph contains multiple disconnected regions:
-{:?}
-(^nodes in each region^)
-Only the regions with drones will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
-				let mut reachable = HashSet::new();
-				for scc in sccs {
-					if sns.iter().any(|s| scc.contains(s)) {
-						reachable.extend(scc);
-					}
-				}
-				g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
-			} else {
-				log::debug!("Damn, what a clean road graph you got there!");
-			}
-		}
+		fix_sccs!(g, sns, "drones");
 		log::debug!("Constructed graph with {} nodes, {} segments and {} drones", g.graph.graph.node_count(), g.graph.graph.edge_count(), sns.len());
 		g.graph.graph.eulirianize::<_, _, _, _, _, false>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe, |e| e).unwrap();
 		log::debug!("Eulirianized graph - increased to {} segments", g.graph.graph.edge_count());
@@ -453,29 +485,7 @@ pub mod road {
 		}
 		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
-		{
-			let sccs = g.graph.graph.strongly_connected_components::<true, false>();
-			log::debug!("Directed sccs: {}", sccs.len());
-			g.graph.graph.patch_sccs::<_, true>(&sccs, |e| RoadEdge { directed: false, ..e });
-			let mut sccs = g.graph.graph.strongly_connected_components::<false, false>();
-			log::debug!("Undirected sccs after patch: {}", sccs.len());
-			if sccs.len() > 1 {
-				sccs.sort_unstable_by_key(|s| -(s.len() as isize));
-				log::warn!(r#"Road graph contains multiple disconnected regions:
-{:?}
-(^nodes in each region^)
-Only the regions with vehicles will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
-				let mut reachable = HashSet::new();
-				for scc in sccs {
-					if sns.iter().any(|s| scc.contains(s)) {
-						reachable.extend(scc);
-					}
-				}
-				g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
-			} else {
-				log::debug!("Damn, what a clean road graph you go there!");
-			}
-		}
+		fix_sccs!(g, sns, "vehicles", |e| RoadEdge { directed: false, ..e });
 		g.graph.graph.eulirianize::<_, _, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe, |e| RoadEdge { directed: false, ..e }).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
@@ -612,29 +622,7 @@ pub mod sidewalk {
 		}
 		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
-		{
-			let sccs = g.graph.graph.strongly_connected_components::<true, false>();
-			log::debug!("Directed sccs: {}", sccs.len());
-			g.graph.graph.patch_sccs::<_, true>(&sccs, |e| RoadEdge { side: SidewalkSide::Wroom, ..e });
-			let mut sccs = g.graph.graph.strongly_connected_components::<false, false>();
-			log::debug!("Undirected sccs after patch: {}", sccs.len());
-			if sccs.len() > 1 {
-				sccs.sort_unstable_by_key(|s| -(s.len() as isize));
-				log::warn!(r#"Road graph contains multiple disconnected regions:
-{:?}
-(^nodes in each region^)
-Only the regions with vehicles will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
-				let mut reachable = HashSet::new();
-				for scc in sccs {
-					if sns.iter().any(|s| scc.contains(s)) {
-						reachable.extend(scc);
-					}
-				}
-				g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
-			} else {
-				log::debug!("Damn, what a clean road graph you go there!");
-			}
-		}
+		fix_sccs!(g, sns, "vehicles", |e| RoadEdge { side: SidewalkSide::Wroom, ..e });
 		g.graph.graph.eulirianize::<_, _, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe, |e| RoadEdge { side: SidewalkSide::Wroom, ..e }).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every sidewalk counts!", _snow_d);
