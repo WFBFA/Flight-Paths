@@ -7,7 +7,6 @@ use std::borrow::Cow;
 use clap::{App, Arg, SubCommand, crate_version};
 mod data;
 mod graph;
-mod brr;
 mod meta;
 mod plow;
 mod gj;
@@ -30,6 +29,22 @@ enum Wut {
 enum SnuwDapg {
 	Formal(data::SnowStatuses),
 	Geo(geojson::FeatureCollection),
+}
+
+/// Merge snow samplings with following rules:
+/// - between a sample without snow and a sample with some snow, sampling with snow wins
+/// - depths of all samples for given road segment are averaged
+fn merge_snow_statuses(snows: impl Iterator<Item = data::SnowStatusElement>) -> data::SnowStatuses {
+	let mut keyed = indexmap::IndexMap::new();
+	for s in snows {
+		let entry = keyed.entry((s.p1, s.p2, s.discriminator)).or_insert(n64(0.0));
+		if *entry <= n64(0.0) || s.depth <= n64(0.0) {
+			*entry = std::cmp::max(*entry, s.depth);
+		} else {
+			*entry = (*entry + s.depth) / n64(2.0);
+		}
+	}
+	keyed.into_iter().map(|((p1, p2, discriminator), depth)| data::SnowStatusElement { p1, p2, discriminator, depth }).collect()
 }
 
 fn main() -> std::io::Result<()> {
@@ -151,7 +166,7 @@ fn main() -> std::io::Result<()> {
 			snu.push(serde_json::from_reader(&std::fs::File::open(f)?).expect("Snow status invalid JSON"));
 		}
 		log::info!("Loaded ❄");
-		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &brr::merge_snow_statuses(snu.into_iter().map(|s| match s {
+		serde_json::to_writer(&std::fs::File::create(matches.value_of("output").unwrap())?, &merge_snow_statuses(snu.into_iter().map(|s| match s {
 			SnuwDapg::Formal(s) => s,
 			SnuwDapg::Geo(feat) => gj::geofeatures_to_snow(&roads, feat),
 		}).flatten())).unwrap();
