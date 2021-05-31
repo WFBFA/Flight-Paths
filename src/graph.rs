@@ -468,7 +468,7 @@ where
 			let mut redir = HashSet::new();
 			for i in 0..regions.len() {
 				for j in (i+1)..regions.len() {
-					for (.., e) in self.get_edges_between_regions::<DIRESPECT>(&regions[i], &regions[j]) {
+					for (.., e) in self.get_edges_between_regions::<false>(&regions[i], &regions[j]) {
 						if e.directed() && !redir.contains(e) {
 							redir.insert(e.clone());
 						}
