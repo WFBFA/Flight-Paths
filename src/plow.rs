@@ -343,6 +343,26 @@ pub mod fly {
 		}
 		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
+		{
+			let mut sccs = g.graph.graph.strongly_connected_components::<false, false>();
+			log::debug!("Undirected sccs: {}", sccs.len());
+			if sccs.len() > 1 {
+				sccs.sort_unstable_by_key(|s| -(s.len() as isize));
+				log::warn!(r#"Road graph contains multiple disconnected regions:
+{:?}
+(^nodes in each region^)
+Only the regions with drones will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
+				let mut reachable = HashSet::new();
+				for scc in sccs {
+					if sns.iter().any(|s| scc.contains(s)) {
+						reachable.extend(scc);
+					}
+				}
+				g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
+			} else {
+				log::debug!("Damn, what a clean road graph you got there!");
+			}
+		}
 		log::debug!("Constructed graph with {} nodes, {} segments and {} drones", g.graph.graph.node_count(), g.graph.graph.edge_count(), sns.len());
 		g.graph.graph.eulirianize::<_, _, _, _, _, false>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe, |e| e).unwrap();
 		log::debug!("Eulirianized graph - increased to {} segments", g.graph.graph.edge_count());
