@@ -433,7 +433,23 @@ pub mod road {
 		}
 		let sns: Vec<_> = sns.into_iter().map(|id| g.graph.id2nid(&id).unwrap()).collect();
 		let locations = sns.iter().map(|id| g.graph.graph.get_node(*id).unwrap().coordinates).collect();
-		g.graph.graph.fix_sadness::<_, true>(|e| RoadEdge { directed: false, ..e });
+		{
+			let sccs = g.graph.graph.strongly_connected_components::<true, false>();
+			log::debug!("Directed sccs: {}", sccs.len());
+			g.graph.graph.patch_sccs::<_, true>(&sccs, |e| RoadEdge { directed: false, ..e });
+			let mut sccs = g.graph.graph.strongly_connected_components::<false, false>();
+			log::debug!("Undirected sccs after patch: {}", sccs.len());
+			if sccs.len() > 1 {
+				sccs.sort_unstable_by_key(|s| -(s.len() as isize));
+				log::warn!(r#"Road graph contains multiple disconnected regions:
+{:?}
+(^nodes in each region^)
+Only the largest region will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
+				g.graph.graph.retain_nodes(|n| sccs[0].contains(&n));
+			} else {
+				log::debug!("Damn, what a clean road graph you go there!");
+			}
+		}
 		g.graph.graph.eulirianize::<_, _, _, _, true>(|e1, e2| e1.duped(e2), |_| Some(0), RoadEdge::dupe).unwrap();
 		let snowy: HashSet<_> = if let Some(_snow_d) = snow_d.filter(|d| *d > 0.0) {
 			log::debug!("Default snow level {:.5} - every edge counts!", _snow_d);
