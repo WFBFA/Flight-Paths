@@ -444,8 +444,14 @@ pub mod road {
 				log::warn!(r#"Road graph contains multiple disconnected regions:
 {:?}
 (^nodes in each region^)
-Only the largest region will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
-				g.graph.graph.retain_nodes_edges(|n| sccs[0].contains(&n));
+Only the regions with vehicles will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
+				let mut reachable = HashSet::new();
+				for scc in sccs {
+					if sns.iter().any(|s| scc.contains(s)) {
+						reachable.extend(scc);
+					}
+				}
+				g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
 			} else {
 				log::debug!("Damn, what a clean road graph you go there!");
 			}
@@ -597,8 +603,14 @@ pub mod sidewalk {
 				log::warn!(r#"Road graph contains multiple disconnected regions:
 {:?}
 (^nodes in each region^)
-Only the largest region will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
-				g.graph.graph.retain_nodes_edges(|n| sccs[0].contains(&n));
+Only the regions with vehicles will be considered!"#, sccs.iter().map(HashSet::len).collect::<Vec<_>>());
+				let mut reachable = HashSet::new();
+				for scc in sccs {
+					if sns.iter().any(|s| scc.contains(s)) {
+						reachable.extend(scc);
+					}
+				}
+				g.graph.graph.retain_nodes_edges(|n| reachable.contains(&n));
 			} else {
 				log::debug!("Damn, what a clean road graph you go there!");
 			}
