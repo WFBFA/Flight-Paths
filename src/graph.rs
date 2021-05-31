@@ -168,30 +168,6 @@ where
 			es.retain(|e| f(e.other(*u)));
 		}
 	}
-	/// Calculate combined degree of a vertex
-	///
-	/// - For an undirected graph, combined degree is "simply" degree - aka number of edges at the vertex.
-	/// - For a directed graph, combined degree is gradient/flow degree - aka outgoing minus incoming edges.
-	/// - For a mixed graph, combined degree is negative absolute strict gradient degree balanced by undirected edges. In proper words, how many undirected edges the node lacks/has extra for/after bailing out disbalance of directed edges.
-	///
-	/// Since we're dealing with only undirected or mixed graphs (specified by `DIRESPECT`), only 1st or 3rd value is returned resp.
-	///
-	/// Type Parameters:
-	/// - `DIRESPECT`: whether the directionality of edges is respected
-	pub fn degree<const DIRESPECT: bool>(&self, n: NId) -> isize {
-		let es = self.get_edges(n);
-		if DIRESPECT {
-			-(es.iter().filter(|e| e.directed() && e.p2() == n).count() as isize - es.iter().filter(|e| e.directed() && e.p1() == n).count() as isize).abs() + es.iter().filter(|e| !e.directed() && !e.is_cyclic()).count() as isize
-		} else {
-			es.iter().filter(|e| !e.is_cyclic()).count() as isize
-			// es.len() as isize //the code above is SLOW!!! we're talking x60 slowdown of undirected eulirinization process!... but you know... the above is like, correct and stuff
-		}
-	}
-	/// Check whether given node does not prevent the graph from being eulirian
-	pub fn eulirian_compatible<const DIRESPECT: bool>(&self, n: NId) -> bool {
-		let d = self.degree::<DIRESPECT>(n);
-		d % 2 == 0 && (!DIRESPECT || d >= 0)
-	}
 	/// Find all edges going from one region to another
 	///
 	/// Arguments:
@@ -318,43 +294,6 @@ where
 		}
 		None
 	}
-	/// Find a (non-trivial) cycle over vertex
-	///
-	/// Currently uses heap-based DFS (and i don't know why, it works tho).
-	///
-	/// Type Parameters:
-	/// - `Weight`: weight of an edge
-	/// - `DIRESPECT`: whether the directionality of edges is respected
-	///
-	/// Arguments:
-	/// - `n`: node id
-	/// - `weight`: filtering weight function - returns the weight of the edge, iff it can be traversed
-	///
-	/// Returns: the edges path from `n` to itself, if such exists
-	pub fn cycle_on<Weight, FW, const DIRESPECT: bool>(&self, n: NId, weight: FW) -> Option<Vec<&E>>
-	where
-		E: Eq,
-		Weight: Clone + Copy + PartialEq + Ord + Default + std::ops::Add<Weight, Output = Weight> + std::ops::Neg<Output = Weight>,
-		FW: Fn(&E) -> Option<Weight>,
-	{
-		let mut q = PriorityQueue::new();
-		q.push((n, Vec::new()), Weight::default()); //FIXME can't use IndexSet coz it doesn't impl Hash :(
-		while let Some(((u, path), d)) = q.pop() {
-			if u == n && !path.is_empty() {
-				return Some(path);
-			}
-			for e in self.get_edges(u) {
-				if !path.contains(&e) && e.is_outgoing::<DIRESPECT>(u) {
-					if let Some(ed) = weight(e) {
-						let mut path = path.clone();
-						path.push(e);
-						q.push((e.other(u), path), d + ed); //FIXME i don't know why this works, but it does
-					}
-				}
-			}
-		}
-		None
-	}
 	/// Detect all strongly connected components in the graph
 	///
 	/// Currently uses unrecursed Tarjan's SCC algorithm.
@@ -431,37 +370,6 @@ where
 			}
 		}
 		sccs
-	}
-	/// Fixes all sad edges
-	///
-	/// A sad edge is an edge(s) that outright prevents Eulirinization of the graph, even after SCC patch.
-	///
-	/// Type Parameters:
-	/// - `DIRESPECT`: whether the directionality of edges is respected (sad edges can only exist in mixed graphs, calling this without respect is no-op)
-	///
-	/// Arguments:
-	/// - `dedirect`: function that transforms a directed edge into an undirected one, preserving all other properties (the function is always and only fed directed edges)
-	pub fn fix_sadness<FD, const DIRESPECT: bool>(&mut self, dedirect: FD)
-	where
-		FD: Fn(E) -> E,
-	{
-		if DIRESPECT {
-			let mut redir = HashSet::new();
-			for (_, es) in &self.edges {
-				if es.len() == 1 {
-					let e = es.iter().next().unwrap();
-					if e.directed() {
-						redir.insert(e.clone());
-					}
-				}
-			}
-			for e in &redir {
-				self.remove_edge(e);
-			}
-			for e in redir.into_iter().map(dedirect) {
-				self.add_edge(e);
-			}
-		}
 	}
 	/// Patches weak links between regions
 	///
@@ -613,11 +521,6 @@ pub mod heuristics {
 	{
 		log::trace!("Solving PWRP, starting with {}", alloc.len());
 		let mut sol: Vec<&E> = Vec::new();
-		macro_rules! sol_weight {
-			() => {
-				|e| if !sol.contains(&e) { weight(e) } else { None }
-			}
-		}
 		macro_rules! sol_inject {
 			($inj:expr,$y:expr) => {
 				log::trace!("of {}", $inj.len());
